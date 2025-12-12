@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuan-in POS - Kasir</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* KOLOM KIRI: MENU */
+        #menu-container { flex: 2; padding: 20px; overflow-y: auto; background: #f4f4f4; border-right: 1px solid #ddd; }
+        .grid-menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .card { background: white; padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .card:hover { transform: translateY(-3px); border: 1px solid #28a745; }
+        .card h3 { margin: 0 0 5px 0; font-size: 16px; }
+        .price { color: #28a745; font-weight: bold; }
+
+        /* KOLOM KANAN: KERANJANG */
+        #cart-container { flex: 1; padding: 20px; display: flex; flex-direction: column; background: white; }
+        #cart-items { flex: 1; overflow-y: auto; margin-bottom: 20px; border-bottom: 2px dashed #ddd; }
+        .cart-item { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .btn-bayar { background: #28a745; color: white; border: none; padding: 15px; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 8px; }
+        .btn-bayar:disabled { background: #ccc; cursor: not-allowed; }
+        .total-section { font-size: 20px; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; }
+
+        /* --- STYLE KHUSUS STRUK (MODAL) --- */
+        #modal-struk {
+            display: none; /* Sembunyi dulu */
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); /* Layar gelap transparan */
+            justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .struk-box {
+            background: white; width: 300px; padding: 20px;
+            font-family: 'Courier New', Courier, monospace; /* Font ala mesin kasir */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .struk-header { border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+        .struk-body { text-align: left; margin-bottom: 10px; font-size: 12px; }
+        .struk-item { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .struk-total { border-top: 2px dashed #000; padding-top: 10px; margin-top: 10px; font-weight: bold; display: flex; justify-content: space-between; font-size: 14px; }
+        .struk-footer { margin-top: 20px; font-size: 10px; color: #555; }
+        
+        .btn-print { background: #333; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; margin-top: 10px; }
+        .btn-close { background: transparent; color: red; border: 1px solid red; padding: 5px; width: 100%; cursor: pointer; margin-top: 5px; }
+
+        /* --- MAGIC PRINT (Supaya pas diprint cuma struknya yang muncul) --- */
+        @media print {
+            body * { visibility: hidden; } /* Sembunyikan semua */
+            #modal-struk, #modal-struk * { visibility: visible; } /* Munculkan struk */
+            #modal-struk { position: absolute; left: 0; top: 0; background: white; }
+            .btn-print, .btn-close { display: none; } /* Jangan print tombolnya */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-container">
+        <h2>🛍️ Pilih Menu</h2>
+        <div id="daftar-menu" class="grid-menu"></div>
+    </div>
+
+    <div id="cart-container">
+        <h2>🧾 Pesanan</h2>
+        <div id="cart-items"><p style="color: #888; text-align: center;">Keranjang kosong...</p></div>
+        <div class="total-section"><span>Total:</span><span id="total-price">Rp 0</span></div>
+        <button id="btn-checkout" class="btn-bayar" disabled>BAYAR SEKARANG</button>
+    </div>
+
+    <div id="modal-struk">
+        <div class="struk-box">
+            <div class="struk-header">
+                <h2 style="margin:0;">CUAN-IN</h2>
+                <p style="margin:5px 0 0;">Jl. Koding No. 1</p>
+            </div>
+            <div id="struk-content" class="struk-body">
+                </div>
+            <div class="struk-total">
+                <span>TOTAL</span>
+                <span id="struk-total-price">Rp 0</span>
+            </div>
+            <div class="struk-footer">
+                <p>Terima Kasih!</p>
+                <p id="struk-date">-</p>
+                <p id="struk-id">#</p>
+            </div>
+            
+            <button class="btn-print" onclick="window.print()">🖨️ PRINT STRUK</button>
+            <button class="btn-close" id="btn-tutup-struk">Tutup & Transaksi Baru</button>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"> 
+        import { auth } from './firebase-config.js'; // Import Auth
+        import { onAuthStateChanged, signOut } 
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"; // Import fungsi cek user
+
+        // --- 👮‍♂️ SATPAM DIGITAL ---
+        // Cek apakah user sedang login?
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                // Kalau TIDAK login, tendang ke login.html
+                alert("⚠️ Anda harus login dulu!");
+                window.location.href = "login.html";
+            } else {
+                // Kalau Login, biarkan (bisa kasih salam sapaan kalau mau)
+                console.log("Selamat datang Boss: " + user.email);
+            }
+        });
+        
+        // Fungsi Logout (Tempel ke window biar bisa dipanggil tombol)
+        window.logout = () => {
+            signOut(auth).then(() => {
+                window.location.href = "login.html";
+            });
+        };
+    </script>
+</body>
+</html>

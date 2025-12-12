@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuan-in Kitchen Display</title>
+    <style>
+        body { font-family: monospace; background-color: #333; color: white; padding: 20px; }
+        h1 { text-align: center; border-bottom: 2px solid #555; padding-bottom: 10px; }
+        
+        /* Grid Layout untuk Tiket Pesanan */
+        #kitchen-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
+            gap: 15px; 
+            margin-top: 20px;
+        }
+
+        /* Desain Tiket */
+        .ticket { 
+            background: #fff; 
+            color: #000; 
+            padding: 15px; 
+            border-radius: 5px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border-top: 5px solid #ffc107; /* Kuning = Baru Masuk */
+            animation: popIn 0.3s ease-out;
+        }
+        
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .ticket-header { font-weight: bold; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .item-list { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+        .item-list li { margin-bottom: 5px; }
+        
+        .btn-done { 
+            width: 100%; 
+            padding: 10px; 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            font-weight: bold;
+        }
+        .btn-done:hover { background: #218838; }
+    </style>
+</head>
+<body>
+
+    <h1>👨‍🍳 DAPUR - CUAN-IN</h1>
+    <div id="kitchen-container">
+        <p style="color: #aaa;">Menunggu pesanan masuk...</p>
+    </div>
+
+    <script type="module">
+        import { db } from './firebase-config.js'; 
+        import { collection, onSnapshot, query, orderBy, where, doc, updateDoc } 
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const container = document.getElementById('kitchen-container');
+
+        // 1. FILTER: Hanya ambil pesanan yang statusnya 'paid' (Sudah dibayar tapi belum dimasak)
+        // Kita abaikan yang statusnya sudah 'served' (selesai)
+        const q = query(
+            collection(db, "orders"), 
+            where("status", "==", "paid"), 
+            orderBy("created_at", "asc") // Yang duluan pesan, muncul paling kiri
+        );
+
+        // 2. REAL-TIME LISTENER
+        onSnapshot(q, (snapshot) => {
+            container.innerHTML = ""; // Reset tampilan
+            
+            if (snapshot.empty) {
+                container.innerHTML = '<p style="color: #aaa; grid-column: 1/-1; text-align: center;">Tidak ada antrian pesanan.</p>';
+                return;
+            }
+
+            snapshot.forEach((docSnapshot) => {
+                const order = docSnapshot.data();
+                const orderId = docSnapshot.id;
+
+                // Render Tiket
+                const ticket = document.createElement('div');
+                ticket.className = 'ticket';
+                
+                // Format Jam
+                const time = order.created_at ? new Date(order.created_at.seconds * 1000).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-';
+
+                // Render List Menu
+                let menuHtml = '';
+                order.items.forEach(item => {
+                    menuHtml += `<li><strong>${item.qty}x</strong> ${item.name}</li>`;
+                });
+
+                ticket.innerHTML = `
+                    <div class="ticket-header">
+                        <span>#${order.order_number.slice(-4)}</span>
+                        <span>🕒 ${time}</span>
+                    </div>
+                    <ul class="item-list">
+                        ${menuHtml}
+                    </ul>
+                    <button class="btn-done" id="btn-${orderId}">✅ SELESAI MASAK</button>
+                `;
+
+                container.appendChild(ticket);
+
+                // Event Listener Tombol Selesai
+                document.getElementById(`btn-${orderId}`).addEventListener('click', () => selesaikanPesanan(orderId));
+            });
+        });
+
+        // 3. FUNGSI UPDATE STATUS (Dari 'paid' jadi 'served')
+        async function selesaikanPesanan(id) {
+            if(!confirm("Pesanan sudah siap dihidangkan?")) return;
+            
+            const orderRef = doc(db, "orders", id);
+            await updateDoc(orderRef, {
+                status: "served"
+            });
+            // Nanti tiket akan hilang otomatis dari layar karena tidak memenuhi filter 'where status == paid'
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuan-in - Laporan Harian</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f4; padding: 20px; max-width: 800px; margin: 0 auto; }
+        
+        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .omzet-box { text-align: right; }
+        .omzet-title { font-size: 14px; color: #888; }
+        .omzet-value { font-size: 32px; font-weight: bold; color: #28a745; margin: 0; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #333; color: white; }
+        tr:hover { background-color: #f9f9f9; }
+        
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; }
+        .bg-paid { background-color: #ffc107; color: black; } /* Kuning */
+        .bg-served { background-color: #28a745; } /* Hijau */
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>📊 Laporan Transaksi</h1>
+            <p>Pantau arus kas harianmu di sini.</p>
+        </div>
+        <div class="omzet-box">
+            <p class="omzet-title">TOTAL OMZET HARI INI</p>
+            <h2 class="omzet-value" id="total-omzet">Rp 0</h2>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Jam</th>
+                <th>No. Order</th>
+                <th>Menu</th>
+                <th>Total</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="tabel-laporan">
+            <tr><td colspan="5" style="text-align: center;">Sedang memuat data...</td></tr>
+        </tbody>
+    </table>
+
+    <script type="module">
+        import { db } from './firebase-config.js'; 
+        import { collection, onSnapshot, query, orderBy } 
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const tabelBody = document.getElementById('tabel-laporan');
+        const omzetEl = document.getElementById('total-omzet');
+
+        // Ambil data 'orders' diurutkan dari yang terbaru
+        const q = query(collection(db, "orders"), orderBy("created_at", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            tabelBody.innerHTML = "";
+            let totalDuit = 0;
+
+            if(snapshot.empty) {
+                tabelBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada transaksi hari ini.</td></tr>';
+                return;
+            }
+
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                
+                // Hitung Omzet
+                totalDuit += data.total_amount;
+
+                // Format Waktu
+                const jam = data.created_at ? new Date(data.created_at.seconds * 1000).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-';
+
+                // Format Menu (ambil ringkasannya aja)
+                const menuList = data.items.map(item => `${item.name} (${item.qty})`).join(", ");
+
+                // Badge Status
+                let badgeClass = data.status === 'served' ? 'bg-served' : 'bg-paid';
+                let statusText = data.status === 'served' ? 'Selesai' : 'Dapur';
+
+                const row = `
+                    <tr>
+                        <td>${jam}</td>
+                        <td>${data.order_number}</td>
+                        <td>${menuList}</td>
+                        <td style="font-weight: bold;">Rp ${data.total_amount.toLocaleString('id-ID')}</td>
+                        <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                    </tr>
+                `;
+                tabelBody.innerHTML += row;
+            });
+
+            // Update Total Omzet di Header
+            omzetEl.innerText = "Rp " + totalDuit.toLocaleString('id-ID');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Cuan-in</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f4f4f4; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 250px; background: #333; color: white; padding: 20px; display: flex; flex-direction: column; }
+        .sidebar h2 { border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 20px; }
+        .menu-item { padding: 15px; cursor: pointer; border-radius: 5px; margin-bottom: 5px; transition: 0.3s; }
+        .menu-item:hover, .menu-item.active { background: #28a745; }
+
+        /* CONTENT */
+        .content { flex: 1; padding: 30px; overflow-y: auto; }
+        .section { display: none; } /* Sembunyikan semua section dulu */
+        .section.active { display: block; } /* Munculkan yang aktif */
+
+        /* FORMS & TABLES */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { cursor: pointer; background: #28a745; color: white; border: none; font-weight: bold; }
+        button.btn-danger { background: #dc3545; }
+        button.btn-edit { background: #ffc107; color: black; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background: #eee; }
+        
+        /* Utility */
+        .row { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>⚙️ Admin Panel</h2>
+        <div class="menu-item active" onclick="showSection('menu-manager')">🍔 Kelola Menu</div>
+        <div class="menu-item" onclick="showSection('transaksi-manager')">🧾 Kelola Transaksi</div>
+        <div class="menu-item" onclick="window.location.href='laporan.html'">📊 Lihat Laporan</div>
+        <div class="menu-item" onclick="window.location.href='index.html'">⬅️ Kembali ke Kasir</div>
+        <div class="menu-item" onclick="logout()" style="background: #dc3545;">🚪 Logout</div>
+    </div>
+
+    <div class="content">
+        
+        <div id="menu-manager" class="section active">
+            <h1>🍔 Manajemen Menu</h1>
+            
+            <div class="card">
+                <h3>Form Menu</h3>
+                <input type="hidden" id="menu-id"> <div class="row">
+                    <input type="text" id="nama" placeholder="Nama Menu (Contoh: Kopi Hitam)" required>
+                    <input type="number" id="harga" placeholder="Harga (Contoh: 15000)" required>
+                </div>
+                <select id="kategori">
+                    <option value="Coffee">Coffee</option>
+                    <option value="Non-Coffee">Non-Coffee</option>
+                    <option value="Makanan">Makanan</option>
+                    <option value="Snack">Snack</option>
+                </select>
+                <button id="btn-simpan-menu">SIMPAN MENU</button>
+                <button id="btn-batal" style="background: #666; display: none;" onclick="resetForm()">BATAL EDIT</button>
+            </div>
+
+            <div class="card">
+                <h3>Daftar Menu Saat Ini</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nama</th>
+                            <th>Kategori</th>
+                            <th>Harga</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabel-menu">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="transaksi-manager" class="section">
+            <h1>🧾 Riwayat Transaksi (Hapus/Void)</h1>
+            <div class="card">
+                <p>⚠️ Hati-hati, menghapus transaksi akan mengubah total omzet di laporan.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>No. Order</th>
+                            <th>Total</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabel-transaksi">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { db } from './firebase-config.js'; 
+        import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } 
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- NAVIGASI SIDEBAR ---
+        window.showSection = (id) => {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // ==========================
+        // 1. LOGIC KELOLA MENU
+        // ==========================
+        const formId = document.getElementById('menu-id');
+        const formNama = document.getElementById('nama');
+        const formHarga = document.getElementById('harga');
+        const formKategori = document.getElementById('kategori');
+        const btnSimpan = document.getElementById('btn-simpan-menu');
+        const btnBatal = document.getElementById('btn-batal');
+
+        // READ (Baca Data Menu)
+        const qMenu = query(collection(db, "products"), orderBy("created_at", "desc"));
+        onSnapshot(qMenu, (snapshot) => {
+            const tbody = document.getElementById('tabel-menu');
+            tbody.innerHTML = "";
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const row = `
+                    <tr>
+                        <td>${data.name}</td>
+                        <td>${data.category}</td>
+                        <td>Rp ${data.price.toLocaleString('id-ID')}</td>
+                        <td>
+                            <button class="btn-edit" onclick="editMenu('${docSnap.id}', '${data.name}', ${data.price}, '${data.category}')">Edit</button>
+                            <button class="btn-danger" onclick="hapusMenu('${docSnap.id}', '${data.name}')">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        });
+
+        // CREATE & UPDATE (Simpan Menu)
+        btnSimpan.addEventListener('click', async () => {
+            if(!formNama.value || !formHarga.value) return alert("Isi nama dan harga!");
+            
+            btnSimpan.innerText = "Menyimpan...";
+            try {
+                const data = {
+                    name: formNama.value,
+                    price: Number(formHarga.value),
+                    category: formKategori.value,
+                    updated_at: serverTimestamp()
+                };
+
+                if (formId.value) {
+                    // MODE EDIT
+                    await updateDoc(doc(db, "products", formId.value), data);
+                    alert("✅ Menu berhasil diupdate!");
+                } else {
+                    // MODE BARU
+                    data.created_at = serverTimestamp();
+                    data.is_active = true;
+                    await addDoc(collection(db, "products"), data);
+                    alert("✅ Menu baru ditambahkan!");
+                }
+                resetForm();
+            } catch (error) {
+                alert("Error: " + error.message);
+            }
+            btnSimpan.innerText = "SIMPAN MENU";
+        });
+
+        // FUNGSI BANTUAN (Global Scope biar bisa dipanggil dari HTML onclick)
+        window.editMenu = (id, nama, harga, kategori) => {
+            formId.value = id;
+            formNama.value = nama;
+            formHarga.value = harga;
+            formKategori.value = kategori;
+            btnSimpan.innerText = "UPDATE MENU";
+            btnBatal.style.display = "block";
+            window.scrollTo(0,0); // Scroll ke atas
+        };
+
+        window.hapusMenu = async (id, nama) => {
+            if(confirm(`Yakin mau hapus menu "${nama}"?`)) {
+                await deleteDoc(doc(db, "products", id));
+            }
+        };
+
+        window.resetForm = () => {
+            formId.value = "";
+            formNama.value = "";
+            formHarga.value = "";
+            btnSimpan.innerText = "SIMPAN MENU";
+            btnBatal.style.display = "none";
+        };
+
+        // ==========================
+        // 2. LOGIC KELOLA TRANSAKSI
+        // ==========================
+        const qOrder = query(collection(db, "orders"), orderBy("created_at", "desc"));
+        onSnapshot(qOrder, (snapshot) => {
+            const tbody = document.getElementById('tabel-transaksi');
+            tbody.innerHTML = "";
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const jam = data.created_at ? new Date(data.created_at.seconds * 1000).toLocaleTimeString('id-ID') : '-';
+                
+                const row = `
+                    <tr>
+                        <td>${jam}</td>
+                        <td>${data.order_number}</td>
+                        <td>Rp ${data.total_amount.toLocaleString('id-ID')}</td>
+                        <td>
+                            <button class="btn-danger" onclick="hapusTransaksi('${docSnap.id}')">Void / Hapus</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        });
+
+        window.hapusTransaksi = async (id) => {
+            // Biasanya di POS butuh password admin, tapi ini kita bikin simple dulu
+            const password = prompt("Masukkan PIN Admin untuk menghapus transaksi ini:");
+            if (password === "1234") { // PIN SEMENTARA
+                await deleteDoc(doc(db, "orders", id));
+                alert("Transaksi dihapus.");
+            } else {
+                alert("PIN Salah!");
+            }
+        };
+
+    </script>
+</body>
+</html>

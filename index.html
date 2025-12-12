@@ -92,20 +92,20 @@
         </div>
     </div>
 
-    <script type="module" src="app.js"> 
-    
-        import { db, auth } from './firebase-config.js'; // TAMBAHKAN 'auth'
-        import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } 
-        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        // TAMBAHKAN INI:
+   <script type="module" src="app.js"></script>
+
+    <script type="module">
+        import { auth } from './firebase-config.js';
         import { onAuthStateChanged, signOut } 
         from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // --- 👮‍♂️ SATPAM DIGITAL ---
+        // Cek Login
         onAuthStateChanged(auth, (user) => {
             if (!user) {
                 alert("⚠️ Eits! Login dulu bos!");
                 window.location.href = "login.html";
+            } else {
+                console.log("Selamat datang: " + user.email);
             }
         });
 
@@ -115,8 +115,6 @@
                 window.location.href = "login.html";
             });
         };
-        
-        // ... (Kode admin sisanya biarkan di bawah sini) ...
     </script>
 </body>
 </html>

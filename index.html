@@ -93,29 +93,30 @@
     </div>
 
     <script type="module" src="app.js"> 
-        import { auth } from './firebase-config.js'; // Import Auth
+    
+        import { db, auth } from './firebase-config.js'; // TAMBAHKAN 'auth'
+        import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } 
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        // TAMBAHKAN INI:
         import { onAuthStateChanged, signOut } 
-        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"; // Import fungsi cek user
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         // --- 👮‍♂️ SATPAM DIGITAL ---
-        // Cek apakah user sedang login?
         onAuthStateChanged(auth, (user) => {
             if (!user) {
-                // Kalau TIDAK login, tendang ke login.html
-                alert("⚠️ Anda harus login dulu!");
+                alert("⚠️ Eits! Login dulu bos!");
                 window.location.href = "login.html";
-            } else {
-                // Kalau Login, biarkan (bisa kasih salam sapaan kalau mau)
-                console.log("Selamat datang Boss: " + user.email);
             }
         });
-        
-        // Fungsi Logout (Tempel ke window biar bisa dipanggil tombol)
+
+        // Fungsi Logout
         window.logout = () => {
             signOut(auth).then(() => {
                 window.location.href = "login.html";
             });
         };
+        
+        // ... (Kode admin sisanya biarkan di bawah sini) ...
     </script>
 </body>
 </html>

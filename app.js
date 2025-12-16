@@ -16,10 +16,10 @@ const payInput = document.getElementById('pay-input');
 const payChange = document.getElementById('pay-change');
 const areaCash = document.getElementById('area-cash');
 const areaQris = document.getElementById('area-qris');
-const areaEdc = document.getElementById('area-edc'); // Baru
+const areaEdc = document.getElementById('area-edc');
 const btnCash = document.getElementById('btn-cash');
 const btnQris = document.getElementById('btn-qris');
-const btnEdc = document.getElementById('btn-edc'); // Baru
+const btnEdc = document.getElementById('btn-edc');
 
 // --- ELEMEN STRUK ---
 const modalStruk = document.getElementById('modal-struk');
@@ -36,6 +36,7 @@ let allProductsList = [];
 let storeConfig = { taxRate: 0, serviceRate: 0, storeName: "CUAN-IN", storeAddress: "Loading...", storeFooter: "Terima Kasih" };
 let currentTransaction = {}; 
 let currentMethod = 'cash'; 
+let activeCategory = 'all';
 
 // --- 0. LOAD CONFIG ---
 async function loadConfig() {
@@ -56,29 +57,52 @@ onSnapshot(q, (snapshot) => {
         productsCache[docSnap.id] = item;
         allProductsList.push(item);
     });
-    renderMenu('all');
+    renderMenu(activeCategory);
 });
 
 window.filterMenu = (kategori, btnElement) => {
+    activeCategory = kategori;
     document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active'));
-    if(btnElement) btnElement.classList.add('active');
+    if(btnElement) {
+        btnElement.classList.add('active');
+    } else {
+        const targetBtn = Array.from(document.querySelectorAll('.cat-btn')).find(b => b.innerText.toLowerCase().includes(kategori === 'all' ? 'semua' : kategori.toLowerCase()));
+        if(targetBtn) targetBtn.classList.add('active');
+    }
     renderMenu(kategori);
 }
 
 function renderMenu(kategori) {
+    if(!daftarMenuEl) return;
     daftarMenuEl.innerHTML = "";
+    
     const filtered = kategori === 'all' ? allProductsList : allProductsList.filter(p => p.category === kategori);
-    if(filtered.length === 0) { daftarMenuEl.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#888;">Kosong.</p>`; return; }
+
+    if(filtered.length === 0) {
+        daftarMenuEl.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#888;">Menu kosong.</p>`;
+        return;
+    }
 
     filtered.forEach(data => {
         const stock = data.stock !== undefined ? data.stock : 0;
         const isHabis = stock <= 0;
         const card = document.createElement('div');
         card.className = 'card';
-        card.style.opacity = isHabis ? "0.6" : "1";
-        card.style.background = isHabis ? "#f9f9f9" : "white";
+        card.style.opacity = isHabis ? "0.5" : "1";
         
-        card.innerHTML = `<h3>${data.name}</h3>${isHabis ? "<span style='color:red; font-size:12px;'>HABIS</span>" : `<span style='color:#666; font-size:12px;'>Stok: ${stock}</span>`}<div class="price">Rp ${data.price.toLocaleString('id-ID')}</div>`;
+        // --- PERBAIKAN DISINI: HAPUS BACKGROUND WHITE ---
+        // Biarkan CSS yang mengatur warnanya (Navi/Dark)
+        if(isHabis) card.style.background = "rgba(0,0,0,0.5)"; // Gelap kalau habis
+        
+        const statusText = isHabis 
+            ? "<span style='color:#ff4757; font-size:12px; font-weight:bold;'>HABIS</span>" 
+            : `<span style='color:#a0aec0; font-size:12px;'>Stok: ${stock}</span>`;
+
+        card.innerHTML = `
+            <h3>${data.name}</h3>
+            ${statusText}
+            <div class="price">Rp ${data.price.toLocaleString('id-ID')}</div>
+        `;
         if (!isHabis) card.addEventListener('click', () => addToCart(data.id));
         daftarMenuEl.appendChild(card);
     });
@@ -107,8 +131,8 @@ window.clearCart = () => { if(confirm("Hapus semua?")) { cart = []; updateCartUI
 function updateCartUI() {
     cartItemsEl.innerHTML = "";
     if (cart.length === 0) {
-        cartItemsEl.innerHTML = `<p style="color:#888; text-align:center; margin-top:50px;">Keranjang kosong...</p>`;
-        btnCheckout.disabled = true; totalPriceEl.innerHTML = ""; btnTotalLabel.innerText = "Rp 0";
+        cartItemsEl.innerHTML = `<div style="text-align:center; color:rgba(255,255,255,0.3); margin-top:50px;">Belum ada pesanan</div>`;
+        btnCheckout.disabled = true; totalPriceEl.innerHTML = `<div style="text-align:center; color:rgba(255,255,255,0.3);">Siap Cuan?</div>`; btnTotalLabel.innerText = "Rp 0";
         return;
     }
     let subtotal = 0;
@@ -117,8 +141,8 @@ function updateCartUI() {
         cartItemsEl.innerHTML += `
             <div class="cart-item">
                 <div class="cart-item-info"><span class="cart-item-name">${item.name}</span><span class="cart-item-price">@${item.price.toLocaleString('id-ID')}</span></div>
-                <div class="qty-controls"><button class="btn-qty red" onclick="changeQty('${item.id}', -1)">${item.qty===1?'🗑️':'-'}</button><span>${item.qty}</span><button class="btn-qty" onclick="changeQty('${item.id}', 1)">+</button></div>
-                <div style="font-weight:bold; margin-left:10px;">${(item.price*item.qty).toLocaleString('id-ID')}</div>
+                <div class="qty-controls"><button class="btn-qty red" onclick="changeQty('${item.id}', -1)">${item.qty===1?'🗑️':'-'}</button><span style="color:white; font-weight:bold;">${item.qty}</span><button class="btn-qty" onclick="changeQty('${item.id}', 1)">+</button></div>
+                <div style="font-weight:bold; margin-left:10px; color:white;">${(item.price*item.qty).toLocaleString('id-ID')}</div>
             </div>`;
     });
     
@@ -127,18 +151,15 @@ function updateCartUI() {
     const grand = subtotal + tax + service;
 
     totalPriceEl.innerHTML = `
-        <div style="display:flex; justify-content:space-between; font-size:13px; color:#555;"><span>Subtotal</span><span>${subtotal.toLocaleString('id-ID')}</span></div>
-        <div style="display:flex; justify-content:space-between; font-size:13px; color:#555;"><span>Tax (${storeConfig.taxRate}%)</span><span>${tax.toLocaleString('id-ID')}</span></div>
-        <div style="display:flex; justify-content:space-between; font-size:13px; color:#555;"><span>Service (${storeConfig.serviceRate}%)</span><span>${service.toLocaleString('id-ID')}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Subtotal</span><span>${subtotal.toLocaleString('id-ID')}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Tax (${storeConfig.taxRate}%)</span><span>${tax.toLocaleString('id-ID')}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Service (${storeConfig.serviceRate}%)</span><span>${service.toLocaleString('id-ID')}</span></div>
     `;
     btnTotalLabel.innerText = "Rp " + grand.toLocaleString('id-ID');
     btnCheckout.disabled = false;
 }
 
-// ==========================================
-// 3. FITUR PEMBAYARAN & KEMBALIAN (UPDATE EDC) 💸
-// ==========================================
-
+// --- 3. PEMBAYARAN & KEMBALIAN ---
 const cleanNum = (val) => Number(String(val).replace(/\./g, "").replace(/,/g, ""));
 const formatNum = (num) => new Intl.NumberFormat('id-ID').format(num);
 
@@ -146,9 +167,9 @@ window.toggleTableInput = () => {
     const type = document.getElementById('order-type').value;
     const tableInput = document.getElementById('table-num');
     if (type === 'takeaway') {
-        tableInput.value = ''; tableInput.disabled = true; tableInput.placeholder = "X"; tableInput.style.backgroundColor = "#e9ecef";
+        tableInput.value = ''; tableInput.disabled = true; tableInput.placeholder = "X"; tableInput.style.opacity = "0.5";
     } else {
-        tableInput.disabled = false; tableInput.placeholder = "No. Meja"; tableInput.style.backgroundColor = "white"; tableInput.focus();
+        tableInput.disabled = false; tableInput.placeholder = "No. Meja"; tableInput.style.opacity = "1"; tableInput.focus();
     }
 }
 
@@ -176,26 +197,22 @@ btnCheckout.addEventListener('click', () => {
     payTotalDisplay.innerText = "Rp " + formatNum(grand);
     payInput.value = "";
     payChange.innerText = "Rp 0";
-    document.getElementById('edc-ref').value = ""; // Reset ref
+    document.getElementById('edc-ref').value = ""; 
     setPaymentMethod('cash'); 
     modalPayment.style.display = "flex"; 
 });
 
-// Update Fungsi Ganti Metode
 window.setPaymentMethod = (method) => {
     currentMethod = method;
-    
-    // Reset Style
     [btnCash, btnQris, btnEdc].forEach(btn => {
-        btn.style.borderColor = '#ddd'; btn.style.color = '#333';
+        btn.style.borderColor = 'rgba(255,255,255,0.2)'; btn.style.color = '#ccc'; btn.style.background = 'var(--bg-main)';
     });
     
-    // Highlight Active
     const activeBtn = method === 'cash' ? btnCash : (method === 'qris' ? btnQris : btnEdc);
-    activeBtn.style.borderColor = '#28a745';
-    activeBtn.style.color = '#28a745';
+    activeBtn.style.borderColor = 'var(--accent-green)';
+    activeBtn.style.color = 'var(--accent-green)';
+    activeBtn.style.background = 'rgba(0,255,136,0.1)';
 
-    // Show/Hide Areas
     areaCash.style.display = 'none';
     areaQris.style.display = 'none';
     areaEdc.style.display = 'none';
@@ -221,10 +238,10 @@ window.calcChange = (input) => {
 
     if (received >= total) {
         payChange.innerText = "Rp " + formatNum(change);
-        payChange.style.color = "#28a745"; 
+        payChange.style.color = "var(--accent-green)"; 
     } else {
         payChange.innerText = "Kurang: Rp " + formatNum(Math.abs(change));
-        payChange.style.color = "#dc3545"; 
+        payChange.style.color = "var(--danger)"; 
     }
 };
 
@@ -241,17 +258,15 @@ window.closePayment = () => {
     modalPayment.style.display = "none";
 };
 
-// --- FINALISASI (EDC ADDED) ---
+// --- FINALISASI ---
 window.processFinalPayment = async () => {
     const received = cleanNum(payInput.value);
     const total = currentTransaction.grand_total;
-    const edcRef = document.getElementById('edc-ref').value; // Ambil No Ref
+    const edcRef = document.getElementById('edc-ref').value;
 
-    // Validasi
     if (currentMethod === 'cash') {
         if (received < total) return alert("⚠️ Uang diterima kurang!");
     } 
-    // QRIS & EDC dianggap uang pas (paid in full)
 
     if (!confirm("Konfirmasi pembayaran?")) return;
 
@@ -269,7 +284,7 @@ window.processFinalPayment = async () => {
             status: 'paid',
             created_at: serverTimestamp(),
             payment_method: currentMethod, 
-            payment_ref: currentMethod === 'edc' ? edcRef : '-', // Simpan No Ref
+            payment_ref: currentMethod === 'edc' ? edcRef : '-', 
             amount_received: currentMethod === 'cash' ? received : total,
             change_amount: currentMethod === 'cash' ? (received - total) : 0
         };
@@ -305,7 +320,6 @@ function renderStruk(data) {
         strukContent.innerHTML += `<div class="struk-item"><span>${i.name} (${i.qty})</span><span>${(i.price*i.qty).toLocaleString('id-ID')}</span></div>`;
     });
     
-    // Label Metode Bayar di Struk
     let methodLabel = 'TUNAI';
     if(data.payment_method === 'qris') methodLabel = 'QRIS';
     if(data.payment_method === 'edc') methodLabel = 'EDC/BANK';

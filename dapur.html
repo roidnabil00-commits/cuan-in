@@ -3,123 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuan-in Kitchen Display</title>
+    <title>Kitchen Display - Neon</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: monospace; background-color: #333; color: white; padding: 20px; }
-        h1 { text-align: center; border-bottom: 2px solid #555; padding-bottom: 10px; }
+        body { font-family: 'Poppins', sans-serif; background: #1a1a2e; color: white; padding: 20px; }
+        h1 { text-align: center; color: #00ff88; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; border-bottom: 2px solid #16213e; padding-bottom: 20px; }
         
-        #kitchen-container { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
-            gap: 15px; 
-            margin-top: 20px;
-        }
-
-        .ticket { 
-            background: #fff; 
-            color: #000; 
-            padding: 15px; 
-            border-radius: 5px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border-top: 5px solid #ffc107; 
-            animation: popIn 0.3s ease-out;
-            display: flex; flex-direction: column;
-        }
+        #kitchen-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         
-        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-        .ticket-header { font-weight: bold; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .item-list { list-style: none; padding: 0; margin: 0; font-size: 14px; flex-grow: 1; }
-        .item-list li { margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .ticket { background: #16213e; border-radius: 15px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); animation: popIn 0.3s; display: flex; flex-direction: column; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         
-        .btn-done { 
-            width: 100%; 
-            padding: 10px; 
-            background: #28a745; 
-            color: white; 
-            border: none; 
-            cursor: pointer; 
-            margin-top: 15px; 
-            font-weight: bold;
-            border-radius: 4px;
-        }
-        .btn-done:hover { background: #218838; }
+        .ticket-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .table-badge { background: #00ff88; color: black; padding: 5px 10px; border-radius: 20px; font-weight: 800; font-size: 14px; }
+        .takeaway-badge { background: #f6ad55; color: black; padding: 5px 10px; border-radius: 20px; font-weight: 800; font-size: 14px; }
+        
+        .item-list { list-style: none; padding: 0; margin: 0; flex: 1; }
+        .item-list li { margin-bottom: 8px; font-size: 15px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 8px; }
+        
+        .btn-done { margin-top: 15px; width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .btn-done:hover { background: #ff6b81; transform: scale(1.02); }
     </style>
 </head>
 <body>
-
-    <h1>👨‍🍳 DAPUR - CUAN-IN</h1>
+    <h1>👨‍🍳 Kitchen Monitor</h1>
     <div id="kitchen-container">
-        <p style="color: #aaa;">Menunggu pesanan masuk...</p>
+        <div style="text-align:center; color:#555; grid-column:1/-1;">Menunggu pesanan...</div>
     </div>
 
     <script type="module">
         import { db } from './firebase-config.js'; 
-        import { collection, onSnapshot, query, orderBy, where, doc, updateDoc } 
-        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, onSnapshot, query, where, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const container = document.getElementById('kitchen-container');
+        const q = query(collection(db, "orders"), where("status", "==", "paid"), orderBy("created_at", "asc"));
+        
+        onSnapshot(q, (snap) => {
+            const container = document.getElementById('kitchen-container');
+            container.innerHTML = "";
+            if (snap.empty) container.innerHTML = '<div style="text-align:center; color:#555; grid-column:1/-1;">Menunggu pesanan...</div>';
 
-        // Filter pesanan yang statusnya 'paid' (masuk dapur)
-        const q = query(
-            collection(db, "orders"), 
-            where("status", "==", "paid"), 
-            orderBy("created_at", "asc")
-        );
-
-        onSnapshot(q, (snapshot) => {
-            container.innerHTML = ""; // Reset tampilan
-            
-            if (snapshot.empty) {
-                container.innerHTML = '<p style="color: #aaa; grid-column: 1/-1; text-align: center;">Tidak ada antrian pesanan.</p>';
-                return;
-            }
-
-            snapshot.forEach((docSnapshot) => {
-                const order = docSnapshot.data();
-                const orderId = docSnapshot.id;
-
-                const ticket = document.createElement('div');
-                ticket.className = 'ticket';
+            snap.forEach(d => {
+                const data = d.data();
+                const items = data.items.map(i => `<li><strong>${i.qty}x</strong> ${i.name}</li>`).join("");
+                const badge = (data.order_type === 'takeaway' || !data.table_number) 
+                    ? `<span class="takeaway-badge">TAKEAWAY</span>` 
+                    : `<span class="table-badge">MEJA ${data.table_number}</span>`;
                 
-                const time = order.created_at ? new Date(order.created_at.seconds * 1000).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-';
-
-                let menuHtml = '';
-                order.items.forEach(item => {
-                    menuHtml += `<li><strong>${item.qty}x</strong> ${item.name} <br><small style="color:#666;">${item.variant || ''}</small></li>`;
-                });
-
-                // Warna Header Meja (Hijau kalau ada meja, Abu kalau tidak)
-                const headerColor = order.table_number ? '#28a745' : '#6c757d';
-
-                ticket.innerHTML = `
-                    <div style="background:${headerColor}; color:white; padding:10px; margin:-15px -15px 10px -15px; border-radius:5px 5px 0 0; display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:18px; font-weight:bold;">Meja ${order.table_number || 'Takeaway'}</span>
-                        <span style="font-size:12px; background:rgba(0,0,0,0.2); padding:2px 5px; border-radius:4px;">${time}</span>
+                const card = document.createElement('div');
+                card.className = 'ticket';
+                card.innerHTML = `
+                    <div class="ticket-header">
+                        ${badge}
+                        <span style="font-size:12px; color:#aaa;">${new Date(data.created_at.seconds*1000).toLocaleTimeString()}</span>
                     </div>
-                    <div style="font-weight:bold; margin-bottom:10px; padding-bottom:5px; border-bottom:2px solid #eee;">
-                        👤 ${order.customer_name || 'Pelanggan'}
-                        <span style="float:right; color:#888; font-size:12px;">#${order.order_number.slice(-4)}</span>
-                    </div>
-                    <ul class="item-list">
-                        ${menuHtml}
-                    </ul>
-                    <button class="btn-done" id="btn-${orderId}">✅ SELESAI MASAK</button>
+                    <div style="margin-bottom:10px; color:#ccc;">👤 ${data.customer_name}</div>
+                    <ul class="item-list">${items}</ul>
+                    <button class="btn-done" onclick="done('${d.id}')">✅ SELESAI</button>
                 `;
-
-                // --- INI YANG KEMARIN HILANG (Tempel tiket ke layar) ---
-                container.appendChild(ticket); 
-
-                document.getElementById(`btn-${orderId}`).addEventListener('click', () => selesaikanPesanan(orderId));
+                container.appendChild(card);
             });
         });
 
-        async function selesaikanPesanan(id) {
-            if(!confirm("Pesanan sudah siap dihidangkan?")) return;
-            const orderRef = doc(db, "orders", id);
-            await updateDoc(orderRef, { status: "served" });
+        window.done = async (id) => {
+            if(confirm("Selesai masak?")) await updateDoc(doc(db, "orders", id), { status: "served" });
         }
     </script>
-
 </body>
 </html>

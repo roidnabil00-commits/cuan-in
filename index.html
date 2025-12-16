@@ -4,74 +4,97 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cuan-in POS - Kasir</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2953/2953363.png">
+
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; background-color: #f8f9fa; }
-        
-        /* KOLOM KIRI: MENU */
-        #menu-container { flex: 2; padding: 20px; display: flex; flex-direction: column; border-right: 1px solid #ddd; }
-        
-        /* HEADER KATEGORI (BARU) */
-        .category-tabs { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 10px; scrollbar-width: none; }
-        .cat-btn { background: white; border: 1px solid #ddd; padding: 8px 20px; border-radius: 20px; cursor: pointer; white-space: nowrap; font-weight: 600; color: #555; transition: 0.2s; }
-        .cat-btn:hover, .cat-btn.active { background: #28a745; color: white; border-color: #28a745; }
-
-        /* GRID MENU */
-        #daftar-menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 50px; }
-        .card { background: white; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; height: 100px; }
-        .card:hover { transform: translateY(-3px); border: 1px solid #28a745; }
-        .card h3 { margin: 0 0 5px 0; font-size: 15px; color: #333; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-        .price { color: #28a745; font-weight: bold; font-size: 14px; }
-
-        /* KOLOM KANAN: KERANJANG */
-        #cart-container { flex: 1; padding: 20px; display: flex; flex-direction: column; background: white; box-shadow: -2px 0 10px rgba(0,0,0,0.05); }
-        .cart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        
-        #cart-items { flex: 1; overflow-y: auto; margin-bottom: 15px; }
-        
-        /* ITEM KERANJANG (UPDATE) */
-        .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #eee; }
-        .cart-item-info { flex: 1; }
-        .cart-item-name { font-weight: 600; font-size: 14px; color: #333; display: block; }
-        .cart-item-price { font-size: 12px; color: #888; }
-        
-        /* TOMBOL QTY (+ -) */
-        .qty-controls { display: flex; align-items: center; gap: 8px; background: #f1f3f5; padding: 3px; border-radius: 6px; }
-        .btn-qty { width: 24px; height: 24px; border: none; background: white; border-radius: 4px; cursor: pointer; font-weight: bold; color: #333; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .btn-qty:hover { background: #e9ecef; }
-        .btn-qty.red { color: #dc3545; }
-
-        /* FOOTER TOTAL */
-        .total-section { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-        .btn-bayar { background: #28a745; color: white; border: none; padding: 15px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .btn-bayar:disabled { background: #ccc; cursor: not-allowed; }
-
-        /* UI LOGOUT */
-        .btn-logout { background: none; border: 1px solid #dc3545; color: #dc3545; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
-        .btn-logout:hover { background: #dc3545; color: white; }
-
-        /* STRUK MODAL (SAMA) */
-        #modal-struk { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .struk-box { background: white; width: 300px; padding: 20px; font-family: 'Courier New', Courier, monospace; text-align: center; }
-        .struk-header { border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-        .struk-body { text-align: left; margin-bottom: 10px; font-size: 12px; }
-        .struk-item { display: flex; justify-content: space-between; margin-bottom: 5px; }
-        .btn-print { background: #333; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; margin-top: 10px; }
-        .btn-close { background: transparent; color: red; border: 1px solid red; padding: 5px; width: 100%; cursor: pointer; margin-top: 5px; }
-        
-        @media print {
-            body * { visibility: hidden; }
-            #modal-struk, #modal-struk * { visibility: visible; }
-            #modal-struk { position: absolute; left: 0; top: 0; background: white; }
-            .btn-print, .btn-close { display: none; }
+        :root {
+            --bg-main: #1a1a2e;
+            --bg-secondary: #16213e;
+            --text-primary: #ffffff;
+            --text-secondary: #e0e0e0; /* Dicerahkan biar kebaca */
+            --accent-purple: #764ba2;
+            --accent-green: #00ff88;
+            --danger: #ff4757;
+            --rounded: 12px;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body { display: flex; height: 100vh; overflow: hidden; background-color: var(--bg-main); color: var(--text-primary); }
+        
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-thumb { background: var(--accent-purple); border-radius: 10px; }
+
+        /* INPUT & SELECT FIX (PENTING!) */
+        input, select, textarea { 
+            color: white !important; /* Paksa teks putih */
+            background-color: var(--bg-secondary) !important;
+        }
+        /* Fix dropdown option biar gak putih-putih */
+        option { background-color: var(--bg-main); color: white; }
+        ::placeholder { color: rgba(255,255,255,0.5) !important; }
+
+        /* LAYOUT */
+        #menu-container { flex: 2; padding: 20px; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.1); }
+        #cart-container { flex: 1; padding: 20px; display: flex; flex-direction: column; background: rgba(0,0,0,0.2); }
+
+        /* HEADER */
+        .header-kasir { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header-kasir h2 { font-weight: 700; color: var(--accent-green); }
+
+        /* TABS */
+        .category-tabs { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; }
+        .cat-btn { background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); padding: 8px 20px; border-radius: 20px; cursor: pointer; color: var(--text-secondary); transition: 0.3s; white-space: nowrap; }
+        .cat-btn:hover, .cat-btn.active { background: var(--accent-purple); color: white; border-color: var(--accent-purple); }
+
+        /* MENU GRID */
+        #daftar-menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 20px; }
+        .card { background: var(--bg-secondary); padding: 15px; border-radius: var(--rounded); cursor: pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; height: 110px; }
+        .card:hover { transform: translateY(-3px); border-color: var(--accent-green); }
+        .card h3 { font-size: 14px; color: white; margin-bottom: 5px; }
+        .price { color: var(--accent-green); font-weight: bold; }
+
+        /* INPUT PELANGGAN */
+        .order-info { margin-bottom: 15px; background: var(--bg-secondary); padding: 10px; border-radius: var(--rounded); border: 1px solid rgba(255,255,255,0.1); }
+        .modern-input { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: var(--bg-main); outline: none; }
+        
+        /* CART ITEM */
+        #cart-items { flex: 1; overflow-y: auto; margin-bottom: 15px; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; }
+        
+        /* TOTAL & BUTTON */
+        .total-section { background: var(--bg-secondary); padding: 15px; border-radius: var(--rounded); margin-bottom: 15px; text-align: center; }
+        .btn-bayar { background: var(--accent-green); color: #000; border: none; padding: 15px; width: 100%; font-weight: 800; border-radius: var(--rounded); cursor: pointer; font-size: 16px; }
+        .btn-bayar:disabled { background: #555; color: #888; cursor: not-allowed; }
+
+        /* MODAL */
+        #modal-payment, #modal-struk { background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); }
+        .modal-box { background: var(--bg-secondary); width: 400px; padding: 25px; border-radius: 20px; text-align: center; color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-method { flex: 1; padding: 12px; background: var(--bg-main); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; cursor: pointer; margin: 0 2px; }
+        
+        /* STRUK (TETAP PUTIH BIAR DIPRINT JELAS) */
+        .struk-box { background: white; color: black; padding: 20px; width: 320px; border-radius: 10px; font-family: monospace; }
+        
+        /* BUTTONS */
+        .btn-logout { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 5px 15px; border-radius: 20px; cursor: pointer; }
+        .btn-clear { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; text-decoration: underline; }
     </style>
 </head>
 <body>
 
     <div id="menu-container">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 style="margin:0;">🛍️ Kasir</h2>
-            <button class="btn-logout" onclick="logout()">Logout</button>
+        <div class="header-kasir">
+            <h2>🚀 Cuan-in</h2>
+            <button class="btn-logout" onclick="logout()">LOGOUT</button>
         </div>
 
         <div class="category-tabs" id="cat-tabs">
@@ -86,44 +109,82 @@
     </div>
 
     <div id="cart-container">
-        <div class="cart-header">
-            <h2 style="margin:0;">🧾 Pesanan</h2>
-            <button onclick="clearCart()" style="border:none; background:none; color:#dc3545; cursor:pointer; font-size:12px;">Hapus Semua</button>
+        <div class="header-kasir">
+            <h3>Pesanan</h3>
+            <button class="btn-clear" onclick="clearCart()">Hapus Semua</button>
         </div>
 
-        <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-            <select id="order-type" onchange="toggleTableInput()" style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #28a745; border-radius:4px; font-weight:bold; color:#28a745;">
-                <option value="dine-in">🍽️ Makan di Tempat (Dine In)</option>
-                <option value="takeaway">🥡 Bungkus (Takeaway)</option>
+        <div class="order-info">
+            <select id="order-type" onchange="toggleTableInput()" class="modern-input">
+                <option value="dine-in">🍽️ Dine In</option>
+                <option value="takeaway">🥡 Takeaway</option>
             </select>
-
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="cust-name" placeholder="Nama Pelanggan" style="border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 60%;">
-                <input type="number" id="table-num" placeholder="No. Meja" style="border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 35%;">
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="cust-name" placeholder="Nama Pelanggan" class="modern-input" style="flex:2">
+                <input type="number" id="table-num" placeholder="Meja" class="modern-input" style="flex:1">
             </div>
         </div>
 
         <div id="cart-items">
-            <p style="color: #888; text-align: center; margin-top: 50px;">Keranjang kosong...</p>
+            <div style="text-align:center; color:rgba(255,255,255,0.3); margin-top:50px;">Belum ada pesanan</div>
         </div>
 
-        <div class="total-section" id="total-price">
-            Rp 0
+        <div class="total-section" id="total-price" style="font-size:14px; color:#aaa;">
+            Total akan muncul di sini
         </div>
         <button id="btn-checkout" class="btn-bayar" disabled>
-            <span>BAYAR</span>
-            <span id="btn-total">Rp 0</span>
+            BAYAR <span id="btn-total">Rp 0</span>
         </button>
     </div>
 
-    <div id="modal-struk">
-        <div class="struk-box">
-            <div class="struk-header">
-                <h2 style="margin:0;">CUAN-IN</h2>
-                <p style="margin:5px 0 0;">Jl. Koding No. 1</p>
+    <div id="modal-payment" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; justify-content: center; align-items: center; z-index: 1001;">
+        <div class="modal-box">
+            <h3 style="margin-bottom:15px;">Pembayaran</h3>
+            <h1 id="pay-total-display" style="color:var(--accent-green); margin-bottom:20px;">Rp 0</h1>
+            
+            <div style="display:flex; margin-bottom:20px;">
+                <button onclick="setPaymentMethod('cash')" id="btn-cash" class="btn-method">Tunai</button>
+                <button onclick="setPaymentMethod('qris')" id="btn-qris" class="btn-method">QRIS</button>
+                <button onclick="setPaymentMethod('edc')" id="btn-edc" class="btn-method">EDC</button>
             </div>
-            <div id="struk-content" class="struk-body"></div>
-            <div style="border-top: 2px dashed #000; padding-top: 10px; font-weight: bold; display: flex; justify-content: space-between;">
+
+            <div id="area-cash">
+                <input type="text" id="pay-input" placeholder="Input Nominal" onkeyup="calcChange(this)" class="modern-input" style="text-align:center; font-size:18px;">
+                <div style="margin:15px 0; color:#aaa;">Kembali: <span id="pay-change" style="color:var(--accent-green); font-weight:bold; font-size:20px;">Rp 0</span></div>
+                <div style="display:flex; gap:5px; justify-content:center; flex-wrap:wrap;">
+                    <button onclick="fastCash(20000)" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px;">20k</button>
+                    <button onclick="fastCash(50000)" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px;">50k</button>
+                    <button onclick="fastCash(100000)" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px;">100k</button>
+                    <button onclick="fastCash('pas')" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px; background:var(--accent-purple);">Uang Pas</button>
+                </div>
+            </div>
+
+            <div id="area-qris" style="display:none;">
+                <div style="background:white; padding:10px; display:inline-block; border-radius:10px;">
+                    <img src="https://via.placeholder.com/150?text=QRIS" width="150">
+                </div>
+                <p style="font-size:12px; color:#aaa; margin-top:10px;">Scan QRIS di atas</p>
+            </div>
+
+            <div id="area-edc" style="display:none;">
+                <input type="text" id="edc-ref" placeholder="No. Ref Transaksi" class="modern-input">
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button onclick="closePayment()" class="btn-method" style="background:rgba(255,255,255,0.1);">Batal</button>
+                <button onclick="processFinalPayment()" class="btn-method" style="background:var(--accent-green); color:black; font-weight:bold; flex:2;">PROSES</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-struk" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; justify-content: center; align-items: center; z-index: 1002;">
+        <div class="struk-box">
+            <div class="struk-header" style="border-bottom:2px dashed #000; padding-bottom:10px; margin-bottom:10px;">
+                <h2 style="margin:0;">CUAN-IN</h2>
+                <p style="margin:0; font-size:12px;">Jl. Koding No. 1</p>
+            </div>
+            <div id="struk-content" style="text-align:left; font-size:12px; margin-bottom:10px;"></div>
+            <div style="border-top:2px dashed #000; padding-top:10px; display:flex; justify-content:space-between; font-weight:bold;">
                 <span>TOTAL</span><span id="struk-total-price">Rp 0</span>
             </div>
             <div class="struk-footer" style="margin-top:20px; font-size:10px; color:#555;">
@@ -131,80 +192,8 @@
                 <p id="struk-date">-</p>
                 <p id="struk-id">#</p>
             </div>
-            <button class="btn-print" onclick="window.print()">🖨️ PRINT</button>
-            <button class="btn-close" id="btn-tutup-struk">Tutup</button>
-        </div>
-    </div>
-
-    <div id="modal-payment" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1001;">
-        <div style="background: white; width: 400px; padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-            
-            <h2 style="margin:0 0 10px 0; color:#333;">Metode Pembayaran</h2>
-            <h1 id="pay-total-display" style="color:#28a745; margin: 0 0 20px 0;">Rp 0</h1>
-
-            <div style="display: flex; gap: 5px; margin-bottom: 20px; justify-content: center;">
-                <button onclick="setPaymentMethod('cash')" id="btn-cash" style="flex:1; padding:10px; border:2px solid #ddd; background:white; border-radius:8px; cursor:pointer; font-weight:bold; font-size:12px;">💵 TUNAI</button>
-                <button onclick="setPaymentMethod('qris')" id="btn-qris" style="flex:1; padding:10px; border:2px solid #ddd; background:white; border-radius:8px; cursor:pointer; font-weight:bold; font-size:12px;">📱 QRIS</button>
-                <button onclick="setPaymentMethod('edc')" id="btn-edc" style="flex:1; padding:10px; border:2px solid #ddd; background:white; border-radius:8px; cursor:pointer; font-weight:bold; font-size:12px;">💳 EDC/BANK</button>
-            </div>
-
-            <div id="area-cash" style="display: block;">
-                <label style="display:block; text-align:left; font-size:12px; margin-bottom:5px;">Uang Diterima</label>
-                <input type="text" id="pay-input" placeholder="0" onkeyup="calcChange(this)" style="width:100%; padding:12px; font-size:18px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px; box-sizing: border-box;">
-                
-                <div style="background:#f8f9fa; padding:10px; border-radius:8px; text-align:left; margin-bottom:10px;">
-                    <small>Kembalian:</small>
-                    <div id="pay-change" style="font-size:20px; font-weight:bold; color:#dc3545;">Rp 0</div>
-                </div>
-                
-                <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center;">
-                    <button onclick="fastCash(20000)" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #ccc; background:white; border-radius:4px;">20k</button>
-                    <button onclick="fastCash(50000)" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #ccc; background:white; border-radius:4px;">50k</button>
-                    <button onclick="fastCash(100000)" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #ccc; background:white; border-radius:4px;">100k</button>
-                    <button onclick="fastCash('pas')" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #28a745; background:#e6fffa; color:#28a745; border-radius:4px; font-weight:bold;">Uang Pas</button>
-                </div>
-            </div>
-
-            <div id="area-qris" style="display: none;">
-                <div style="background: #f8f9fa; border: 2px dashed #ccc; width: 200px; height: 200px; margin: 0 auto; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
-                    <img src="https://via.placeholder.com/200?text=TEMPLET+QRIS+DISINI" alt="QRIS Code" style="max-width: 100%; max-height: 100%;">
-                </div>
-                <p style="font-size:12px; color:#666; margin-top:10px;">Scan QRIS di atas. Pastikan nominal sesuai.</p>
-            </div>
-
-            <div id="area-edc" style="display: none;">
-                <p style="font-size:14px; color:#333; margin-bottom:15px;">Silakan gesek kartu di mesin EDC atau arahkan pelanggan transfer ke:</p>
-                
-                <div style="background:#e6fffa; padding:15px; border-radius:8px; border:1px solid #b2f5ea; text-align:left; font-size:13px;">
-                    <strong>BCA:</strong> 123-456-7890 (A.n Cuan-in)<br>
-                    <strong>Mandiri:</strong> 123-000-444-555<br>
-                    <small style="color:#666;">(Sesuaikan info ini di kodingan index.html)</small>
-                </div>
-
-                <label style="display:block; text-align:left; font-size:12px; margin:15px 0 5px;">No. Ref / Kode Transaksi (Opsional)</label>
-                <input type="text" id="edc-ref" placeholder="Contoh: TRF-12345" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; box-sizing: border-box;">
-            </div>
-
-            <hr style="margin: 20px 0; border-top: 1px solid #eee;">
-
-            <div style="display: flex; gap: 10px;">
-                <button onclick="closePayment()" style="flex:1; padding:12px; background:#e2e8f0; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Batal</button>
-                <button onclick="processFinalPayment()" style="flex:2; padding:12px; background:#28a745; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">✅ KONFIRMASI BAYAR</button>
-            </div>
-        </div>
-    </div>
-
-            <div id="area-qris" style="display: none;">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" style="width:200px; height:200px; border:1px solid #eee;">
-                <p style="font-size:12px; color:#666;">Scan QRIS di atas untuk membayar</p>
-            </div>
-
-            <hr style="margin: 20px 0; border-top: 1px solid #eee;">
-
-            <div style="display: flex; gap: 10px;">
-                <button onclick="closePayment()" style="flex:1; padding:12px; background:#e2e8f0; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Batal</button>
-                <button onclick="processFinalPayment()" style="flex:2; padding:12px; background:#28a745; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">✅ SELESAI & CETAK</button>
-            </div>
+            <button onclick="window.print()" style="width:100%; padding:10px; background:#333; color:white; border:none; margin-top:10px; cursor:pointer;">PRINT</button>
+            <button id="btn-tutup-struk" style="width:100%; padding:10px; background:none; border:1px solid red; color:red; margin-top:5px; cursor:pointer;">TUTUP</button>
         </div>
     </div>
 
@@ -212,7 +201,6 @@
     <script type="module">
         import { auth } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        
         onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
         window.logout = () => { signOut(auth).then(() => { window.location.href = "login.html"; }); };
     </script>

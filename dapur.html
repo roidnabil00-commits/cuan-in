@@ -95,20 +95,19 @@
                 });
 
                 ticket.innerHTML = `
-                    <div class="ticket-header">
-                        <span>#${order.order_number.slice(-4)}</span>
-                        <span>🕒 ${time}</span>
+                    <div class="ticket-header" style="background:${order.table_number ? '#28a745' : '#ccc'}; color:white; padding:5px; margin:-15px -15px 10px -15px; border-radius:5px 5px 0 0; display:flex; justify-content:space-between;">
+                        <span style="font-size:16px;">Meja ${order.table_number || '-'}</span>
+                        <span style="font-size:12px;">${time}</span>
+                    </div>
+                    <div style="font-weight:bold; margin-bottom:5px; border-bottom:1px dashed #ddd; padding-bottom:5px;">
+                        ${order.customer_name || 'Tanpa Nama'}
+                        <span style="float:right; color:#888; font-size:10px;">#${order.order_number.slice(-4)}</span>
                     </div>
                     <ul class="item-list">
                         ${menuHtml}
                     </ul>
                     <button class="btn-done" id="btn-${orderId}">✅ SELESAI MASAK</button>
                 `;
-
-                container.appendChild(ticket);
-
-                // Event Listener Tombol Selesai
-                document.getElementById(`btn-${orderId}`).addEventListener('click', () => selesaikanPesanan(orderId));
             });
         });
 

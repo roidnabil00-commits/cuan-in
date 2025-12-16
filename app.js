@@ -199,7 +199,16 @@ function updateCartUI() {
 
 // 3. CHECKOUT
 btnCheckout.addEventListener('click', async () => {
-    if(!confirm("Proses transaksi ini?")) return;
+    // 1. Validasi Input Pelanggan
+    const custName = document.getElementById('cust-name').value.trim();
+    const tableNum = document.getElementById('table-num').value.trim();
+
+    if (!custName || !tableNum) {
+        alert("⚠️ Mohon isi Nama Pelanggan dan Nomor Meja!");
+        return;
+    }
+
+    if(!confirm(`Proses transaksi untuk Meja ${tableNum} (${custName})?`)) return;
 
     try {
         btnCheckout.disabled = true;
@@ -212,22 +221,34 @@ btnCheckout.addEventListener('click', async () => {
         const nomorOrder = "INV-" + Date.now();
 
         const batch = writeBatch(db);
+        
+        // A. Potong Stok
         cart.forEach(item => {
             const productRef = doc(db, "products", item.id);
             const newStock = productsCache[item.id].stock - item.qty;
             batch.update(productRef, { stock: newStock });
         });
 
+        // B. Simpan Order (TAMBAH DATA PELANGGAN)
         const orderRef = doc(collection(db, "orders"));
         const orderData = {
-            order_number: nomorOrder, subtotal, tax, service, grand_total: grandTotal,
-            items: cart, status: 'paid', created_at: serverTimestamp()
+            order_number: nomorOrder,
+            customer_name: custName, // Baru
+            table_number: tableNum,  // Baru
+            subtotal, tax, service, grand_total: grandTotal,
+            items: cart, 
+            status: 'paid', 
+            created_at: serverTimestamp()
         };
         batch.set(orderRef, orderData);
 
         await batch.commit();
         renderStruk(orderData);
         modalStruk.style.display = "flex";
+        
+        // Reset Form Pelanggan
+        document.getElementById('cust-name').value = "";
+        document.getElementById('table-num').value = "";
 
     } catch (error) {
         alert("Gagal: " + error.message);
@@ -236,12 +257,19 @@ btnCheckout.addEventListener('click', async () => {
     }
 });
 
+// Update renderStruk juga biar nama pelanggan muncul di struk
 function renderStruk(data) {
     document.querySelector('.struk-header h2').innerText = storeConfig.storeName || "CUAN-IN";
     document.querySelector('.struk-header p').innerText = storeConfig.storeAddress || "";
     document.querySelector('.struk-footer p:first-child').innerText = storeConfig.storeFooter || "Terima Kasih!";
 
-    strukContent.innerHTML = "";
+    // Info Pelanggan di Struk
+    strukContent.innerHTML = `
+        <div style="border-bottom:1px dashed #000; padding-bottom:5px; margin-bottom:5px; font-size:12px;">
+            Meja: <strong>${data.table_number}</strong> / ${data.customer_name}
+        </div>
+    `;
+
     data.items.forEach(item => {
         strukContent.innerHTML += `
             <div class="struk-item">
@@ -250,7 +278,6 @@ function renderStruk(data) {
             </div>`;
     });
     
-    // Tambah detail pajak di struk
     strukContent.innerHTML += `
         <hr style="border-top:1px dashed #000; margin:5px 0;">
         <div class="struk-item"><span>Subtotal</span><span>${data.subtotal.toLocaleString('id-ID')}</span></div>
@@ -262,9 +289,3 @@ function renderStruk(data) {
     strukDate.innerText = new Date().toLocaleString('id-ID');
     strukId.innerText = data.order_number;
 }
-
-btnTutupStruk.addEventListener('click', () => {
-    modalStruk.style.display = "none";
-    cart = [];
-    updateCartUI();
-});

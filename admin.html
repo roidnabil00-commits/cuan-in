@@ -51,9 +51,13 @@
         <div class="sidebar-header">
             <h2>🚀 CUAN-IN <span style="font-size:12px; color:#666; margin-left:auto;">Admin</span></h2>
         </div>
+        
         <div class="menu-item active" onclick="showSection('dashboard-section')">📊 Dashboard</div>
         <div class="menu-item" onclick="showSection('menu-manager')">🍔 Kelola Menu</div>
         <div class="menu-item" onclick="showSection('transaksi-manager')">🧾 Riwayat Order</div>
+        
+        <div class="menu-item" onclick="window.location.href='laporan.html'">📄 Laporan Detail</div>
+        
         <div class="menu-item" onclick="showSection('settings-manager')">🏢 Pengaturan</div>
         <div class="menu-item" onclick="window.location.href='index.html'">⬅️ Ke Mesin Kasir</div>
         <div class="menu-item" onclick="logout()" style="margin-top: auto; background: #2d3748;">🚪 Logout</div>
@@ -168,7 +172,8 @@
             if(id === 'dashboard-section') items[0].classList.add('active');
             if(id === 'menu-manager') items[1].classList.add('active');
             if(id === 'transaksi-manager') items[2].classList.add('active');
-            if(id === 'settings-manager') items[3].classList.add('active');
+            // Index 3 itu Laporan, Index 4 itu Settings
+            if(id === 'settings-manager') items[4].classList.add('active');
         };
 
         window.formatRupiah = (input) => {
@@ -187,7 +192,7 @@
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: [], // Jam 08:00, 09:00, dll
+                    labels: [],
                     datasets: [{
                         label: 'Penjualan (Rp)',
                         data: [],
@@ -201,28 +206,23 @@
                 options: { responsive: true, plugins: { legend: { display: false } } }
             });
         }
-        initChart(); // Jalankan chart kosong dulu
+        initChart(); 
 
         // LISTEN ORDERS (Dashboard & Transaksi)
         const qOrder = query(collection(db, "orders"), orderBy("created_at", "desc"));
         onSnapshot(qOrder, (snapshot) => {
-            // A. Update Tabel Transaksi
             const tbody = document.getElementById('tabel-transaksi');
             tbody.innerHTML = "";
-            
-            // B. Variabel Dashboard
             let omzetHariIni = 0;
             let orderHariIni = 0;
             const today = new Date().toDateString();
-            
-            // Data Grafik (Per Jam)
             const salesPerHour = {}; 
 
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
                 const total = data.grand_total ? data.grand_total : data.total_amount;
                 
-                // 1. Render Tabel (Cuma 50 terakhir biar gak berat)
+                // Render Tabel (Limit 50)
                 if (tbody.children.length < 50) {
                     const jam = data.created_at ? new Date(data.created_at.seconds * 1000).toLocaleTimeString('id-ID') : '-';
                     tbody.innerHTML += `
@@ -233,34 +233,29 @@
                         </tr>`;
                 }
 
-                // 2. Hitung Dashboard (Hanya Data HARI INI)
+                // Dashboard Stats
                 if (data.created_at) {
                     const dateObj = new Date(data.created_at.seconds * 1000);
                     if (dateObj.toDateString() === today) {
                         omzetHariIni += total;
                         orderHariIni += 1;
-
-                        // Kelompokkan per jam untuk Grafik
                         const hour = dateObj.getHours() + ":00";
                         salesPerHour[hour] = (salesPerHour[hour] || 0) + total;
                     }
                 }
             });
 
-            // Update Kartu Dashboard
             document.getElementById('dash-omzet').innerText = "Rp " + omzetHariIni.toLocaleString('id-ID');
             document.getElementById('dash-count').innerText = orderHariIni;
 
-            // Update Grafik Chart.js
             const sortedHours = Object.keys(salesPerHour).sort();
             const sortedValues = sortedHours.map(h => salesPerHour[h]);
-            
             myChart.data.labels = sortedHours.length > 0 ? sortedHours : ["Belum ada data"];
             myChart.data.datasets[0].data = sortedValues.length > 0 ? sortedValues : [0];
             myChart.update();
         });
 
-        // LISTEN PRODUCTS (Stok Dashboard & Menu Manager)
+        // LISTEN PRODUCTS
         const qMenu = query(collection(db, "products"), orderBy("created_at", "desc"));
         onSnapshot(qMenu, (snapshot) => {
             const tbody = document.getElementById('tabel-menu');
@@ -270,8 +265,6 @@
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
                 const stok = data.stock !== undefined ? data.stock : 0;
-                
-                // Hitung Stok Kritis
                 if (stok < 5) lowStockCount++;
 
                 const row = `
@@ -289,8 +282,7 @@
             document.getElementById('dash-stock').innerText = lowStockCount + " Item";
         });
 
-        // --- LOGIC CRUD LAINNYA (SAMA) ---
-        // (Saya ringkas biar rapi, fungsinya tetap sama)
+        // CRUD LOGIC
         const formId = document.getElementById('menu-id');
         const btnSimpan = document.getElementById('btn-simpan-menu');
         

@@ -136,6 +136,78 @@
         </div>
     </div>
 
+    <div id="modal-payment" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1001;">
+        <div style="background: white; width: 400px; padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+            
+            <h2 style="margin:0 0 10px 0; color:#333;">Metode Pembayaran</h2>
+            <h1 id="pay-total-display" style="color:#28a745; margin: 0 0 20px 0;">Rp 0</h1>
+
+            <div style="display: flex; gap: 5px; margin-bottom: 20px; justify-content: center;">
+                <button onclick="setPaymentMethod('cash')" id="btn-cash" style="flex:1; padding:10px; border:2px solid #ddd; background:white; border-radius:8px; cursor:pointer; font-weight:bold; font-size:12px;">💵 TUNAI</button>
+                <button onclick="setPaymentMethod('qris')" id="btn-qris" style="flex:1; padding:10px; border:2px solid #ddd; background:white; border-radius:8px; cursor:pointer; font-weight:bold; font-size:12px;">📱 QRIS</button>
+                <button onclick="setPaymentMethod('edc')" id="btn-edc" style="flex:1; padding:10px; border:2px solid #ddd; background:white; border-radius:8px; cursor:pointer; font-weight:bold; font-size:12px;">💳 EDC/BANK</button>
+            </div>
+
+            <div id="area-cash" style="display: block;">
+                <label style="display:block; text-align:left; font-size:12px; margin-bottom:5px;">Uang Diterima</label>
+                <input type="text" id="pay-input" placeholder="0" onkeyup="calcChange(this)" style="width:100%; padding:12px; font-size:18px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px; box-sizing: border-box;">
+                
+                <div style="background:#f8f9fa; padding:10px; border-radius:8px; text-align:left; margin-bottom:10px;">
+                    <small>Kembalian:</small>
+                    <div id="pay-change" style="font-size:20px; font-weight:bold; color:#dc3545;">Rp 0</div>
+                </div>
+                
+                <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center;">
+                    <button onclick="fastCash(20000)" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #ccc; background:white; border-radius:4px;">20k</button>
+                    <button onclick="fastCash(50000)" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #ccc; background:white; border-radius:4px;">50k</button>
+                    <button onclick="fastCash(100000)" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #ccc; background:white; border-radius:4px;">100k</button>
+                    <button onclick="fastCash('pas')" style="font-size:11px; padding:5px 10px; cursor:pointer; border:1px solid #28a745; background:#e6fffa; color:#28a745; border-radius:4px; font-weight:bold;">Uang Pas</button>
+                </div>
+            </div>
+
+            <div id="area-qris" style="display: none;">
+                <div style="background: #f8f9fa; border: 2px dashed #ccc; width: 200px; height: 200px; margin: 0 auto; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                    <img src="https://via.placeholder.com/200?text=TEMPLET+QRIS+DISINI" alt="QRIS Code" style="max-width: 100%; max-height: 100%;">
+                </div>
+                <p style="font-size:12px; color:#666; margin-top:10px;">Scan QRIS di atas. Pastikan nominal sesuai.</p>
+            </div>
+
+            <div id="area-edc" style="display: none;">
+                <p style="font-size:14px; color:#333; margin-bottom:15px;">Silakan gesek kartu di mesin EDC atau arahkan pelanggan transfer ke:</p>
+                
+                <div style="background:#e6fffa; padding:15px; border-radius:8px; border:1px solid #b2f5ea; text-align:left; font-size:13px;">
+                    <strong>BCA:</strong> 123-456-7890 (A.n Cuan-in)<br>
+                    <strong>Mandiri:</strong> 123-000-444-555<br>
+                    <small style="color:#666;">(Sesuaikan info ini di kodingan index.html)</small>
+                </div>
+
+                <label style="display:block; text-align:left; font-size:12px; margin:15px 0 5px;">No. Ref / Kode Transaksi (Opsional)</label>
+                <input type="text" id="edc-ref" placeholder="Contoh: TRF-12345" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; box-sizing: border-box;">
+            </div>
+
+            <hr style="margin: 20px 0; border-top: 1px solid #eee;">
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closePayment()" style="flex:1; padding:12px; background:#e2e8f0; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Batal</button>
+                <button onclick="processFinalPayment()" style="flex:2; padding:12px; background:#28a745; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">✅ KONFIRMASI BAYAR</button>
+            </div>
+        </div>
+    </div>
+
+            <div id="area-qris" style="display: none;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" style="width:200px; height:200px; border:1px solid #eee;">
+                <p style="font-size:12px; color:#666;">Scan QRIS di atas untuk membayar</p>
+            </div>
+
+            <hr style="margin: 20px 0; border-top: 1px solid #eee;">
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closePayment()" style="flex:1; padding:12px; background:#e2e8f0; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Batal</button>
+                <button onclick="processFinalPayment()" style="flex:2; padding:12px; background:#28a745; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">✅ SELESAI & CETAK</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="app.js"></script>
     <script type="module">
         import { auth } from './firebase-config.js';

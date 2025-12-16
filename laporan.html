@@ -20,7 +20,7 @@
         .btn-pdf { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: auto; display: flex; align-items: center; gap: 5px; }
         .btn-pdf:hover { background: #c53030; }
 
-        /* AREA LAPORAN (Yang akan di-print) */
+        /* AREA LAPORAN */
         #report-area { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 500px; }
         
         .report-header { text-align: center; margin-bottom: 30px; border-bottom: 2px dashed #e2e8f0; padding-bottom: 20px; }
@@ -40,9 +40,11 @@
         th { background-color: #2d3748; color: white; font-weight: 600; text-transform: uppercase; font-size: 12px; }
         tr:nth-child(even) { background-color: #f9fafb; }
         
-        .badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-        .bg-green { background-color: #c6f6d5; color: #22543d; }
-        .bg-yellow { background-color: #fefcbf; color: #744210; }
+        .badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; display: inline-block; margin-top: 2px; }
+        .bg-green { background-color: #c6f6d5; color: #22543d; } /* Tunai */
+        .bg-yellow { background-color: #fefcbf; color: #744210; } /* Takeaway */
+        .bg-blue { background-color: #bee3f8; color: #2b6cb0; } /* QRIS/EDC */
+        .bg-gray { background-color: #edf2f7; color: #4a5568; }
 
         /* Nav */
         .nav-link { display: inline-block; margin-top: 20px; text-decoration: none; color: #718096; font-weight: 600; }
@@ -98,9 +100,8 @@
                 <tr>
                     <th>Waktu</th>
                     <th>No. Order</th>
-                    <th>Tipe/Meja</th>
-                    <th>Menu Items</th>
-                    <th>Total</th>
+                    <th>Pelanggan</th>
+                    <th>Metode Bayar</th> <th>Total</th>
                 </tr>
             </thead>
             <tbody id="tabel-laporan">
@@ -122,39 +123,29 @@
         import { onAuthStateChanged } 
         from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // Cek Login
         onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
 
-        // Variabel Global
         let allOrders = [];
         let currentFilter = 'today';
 
-        // 1. Ambil Nama Toko buat Header PDF
         getDoc(doc(db, "settings", "store_config")).then(snap => {
             if(snap.exists()) document.getElementById('store-name-display').innerText = (snap.data().storeName || "CUAN-IN") + " REPORT";
         });
 
-        // 2. Ambil Data Sekali, Filter di Client (Biar Hemat Read)
         const q = query(collection(db, "orders"), orderBy("created_at", "desc"));
         onSnapshot(q, (snapshot) => {
             allOrders = [];
             snapshot.forEach((doc) => {
                 const d = doc.data();
-                // Pastikan ada created_at biar gak error
                 if(d.created_at) allOrders.push(d);
             });
-            // Render default (Hari Ini)
             filterAndRender();
         });
 
-        // 3. Logic Filter Pintar
         window.setFilter = (type, btn) => {
             currentFilter = type;
-            
-            // Reset tombol warna
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
-            if(btn && type !== 'custom') btn.classList.add('active'); // Kalau custom, gak ada tombol yg aktif
-
+            if(btn && type !== 'custom') btn.classList.add('active');
             filterAndRender();
         }
 
@@ -164,43 +155,35 @@
             let endDate = new Date();
             let labelPeriode = "";
 
-            // Reset jam ke 00:00:00 untuk start, dan 23:59:59 untuk end
             startDate.setHours(0,0,0,0);
             endDate.setHours(23,59,59,999);
 
             if (currentFilter === 'today') {
-                // Default: Hari Ini
                 labelPeriode = formatDate(today);
             } 
             else if (currentFilter === 'week') {
-                // Minggu Ini (Senin - Minggu)
-                const day = startDate.getDay() || 7; // Ubah Minggu(0) jadi 7
-                if(day !== 1) startDate.setHours(-24 * (day - 1)); // Mundur ke Senin
+                const day = startDate.getDay() || 7; 
+                if(day !== 1) startDate.setHours(-24 * (day - 1));
                 labelPeriode = `${formatDate(startDate)} - ${formatDate(endDate)}`;
             }
             else if (currentFilter === 'month') {
-                // Bulan Ini (Tgl 1 - Akhir)
                 startDate.setDate(1);
-                labelPeriode = `${formatDate(startDate)} - ${formatDate(today)}`; // Sampai hari ini aja
+                labelPeriode = `${formatDate(startDate)} - ${formatDate(today)}`;
             }
             else if (currentFilter === '3months') {
-                // 3 Bulan Kebelakang
                 startDate.setMonth(startDate.getMonth() - 3);
                 labelPeriode = `${formatDate(startDate)} - ${formatDate(today)}`;
             }
             else if (currentFilter === 'custom') {
-                // Tanggal Custom dari Input
                 const inputVal = document.getElementById('custom-date').value;
-                if(!inputVal) return; // Jangan jalankan kalau kosong
+                if(!inputVal) return;
                 startDate = new Date(inputVal);
                 startDate.setHours(0,0,0,0);
-                
                 endDate = new Date(inputVal);
                 endDate.setHours(23,59,59,999);
                 labelPeriode = formatDate(startDate);
             }
 
-            // FILTER DATA ARRAY
             const filteredData = allOrders.filter(order => {
                 const orderDate = new Date(order.created_at.seconds * 1000);
                 return orderDate >= startDate && orderDate <= endDate;
@@ -229,23 +212,35 @@
 
                 const dateObj = new Date(order.created_at.seconds * 1000);
                 const jam = dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-                const tgl = dateObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}); // Tgl pendek
+                const tgl = dateObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'});
 
-                const menuList = order.items.map(i => `${i.name} (${i.qty})`).join(", ");
-                
-                // Cek Tipe Order
-                let tipeMeja = `<span class="badge bg-green">Meja ${order.table_number}</span>`;
+                // Info Pelanggan & Meja
+                let infoPelanggan = `<span style="font-weight:bold;">${order.customer_name || '-'}</span>`;
                 if(order.order_type === 'takeaway' || order.table_number == 0) {
-                    tipeMeja = `<span class="badge bg-yellow">Takeaway</span>`;
+                    infoPelanggan += `<br><span class="badge bg-yellow">Takeaway</span>`;
+                } else {
+                    infoPelanggan += `<br><span class="badge bg-gray">Meja ${order.table_number}</span>`;
+                }
+
+                // Info Pembayaran (NEW LOGIC)
+                let badgeBayar = '<span class="badge bg-gray">?</span>';
+                let method = order.payment_method || 'cash'; // fallback ke cash kalau data lama
+                
+                if(method === 'cash') badgeBayar = '<span class="badge bg-green">TUNAI</span>';
+                else if(method === 'qris') badgeBayar = '<span class="badge bg-blue">QRIS</span>';
+                else if(method === 'edc') badgeBayar = '<span class="badge bg-blue">EDC/BANK</span>';
+
+                let refInfo = "";
+                if(order.payment_ref && order.payment_ref !== '-') {
+                    refInfo = `<br><small style="color:#666; font-size:10px;">Ref: ${order.payment_ref}</small>`;
                 }
 
                 tbody.innerHTML += `
                     <tr>
                         <td>${tgl} <br> <small style="color:#888">${jam}</small></td>
                         <td>${order.order_number}</td>
-                        <td>${tipeMeja}<br><small>${order.customer_name}</small></td>
-                        <td style="max-width:250px;">${menuList}</td>
-                        <td style="font-weight:bold;">Rp ${total.toLocaleString('id-ID')}</td>
+                        <td>${infoPelanggan}</td>
+                        <td>${badgeBayar} ${refInfo}</td> <td style="font-weight:bold;">Rp ${total.toLocaleString('id-ID')}</td>
                     </tr>
                 `;
             });
@@ -256,7 +251,6 @@
         function updateSummary(omzet, trx) {
             document.getElementById('total-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
             document.getElementById('total-trx').innerText = trx;
-            
             const avg = trx > 0 ? Math.round(omzet / trx) : 0;
             document.getElementById('avg-order').innerText = "Rp " + avg.toLocaleString('id-ID');
         }
@@ -265,7 +259,6 @@
             return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
-        // 4. FUNGSI DOWNLOAD PDF
         window.downloadPDF = () => {
             const element = document.getElementById('report-area');
             const opt = {
@@ -275,7 +268,6 @@
                 html2canvas:  { scale: 2 },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
-            // Generate PDF
             html2pdf().set(opt).from(element).save();
         };
     </script>

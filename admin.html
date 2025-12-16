@@ -121,10 +121,10 @@
         </div>
 
         <div id="trx-mgr" class="section">
-            <h1>Riwayat Transaksi</h1>
+            <h1>Riwayat Transaksi (Terbaru)</h1>
             <div class="panel">
                 <table>
-                    <thead><tr><th>Waktu</th><th>Order ID</th><th>Total</th><th>Aksi</th></tr></thead>
+                    <thead><tr><th>Waktu</th><th>Order ID</th><th>Total</th><th>Status</th></tr></thead>
                     <tbody id="tabel-transaksi"></tbody>
                 </table>
             </div>
@@ -149,65 +149,109 @@
     </div>
 
     <script type="module">
-        import { db, auth } from './firebase-config.js'; 
-        import { collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        // Import SUPABASE (Bukan Firebase lagi!)
+        import { db } from './firebase-config.js'; 
 
-        onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
-        window.logout = () => signOut(auth).then(() => window.location.href = "login.html");
+        // Untuk sementara Auth dimatikan dulu biar gampang testing
+        window.logout = () => { window.location.href = "login.html"; };
 
-        // --- DASHBOARD CHART ---
+        // --- CHART JS SETUP ---
         let myChart = new Chart(document.getElementById('salesChart'), {
             type: 'line',
             data: { labels: [], datasets: [{ label: 'Sales', data: [], borderColor: '#00ff88', tension: 0.4 }] },
             options: { plugins: { legend: {display:false} }, scales: { y: { grid: { color: 'rgba(255,255,255,0.1)' } } } }
         });
 
-        // --- DATA LOADERS ---
-        onSnapshot(query(collection(db, "orders"), orderBy("created_at", "desc")), (snap) => {
-            const tbodyTrx = document.getElementById('tabel-transaksi'); tbodyTrx.innerHTML = "";
-            let omzet = 0, count = 0, salesMap = {};
-            const today = new Date().toDateString();
-
-            snap.forEach(d => {
-                const data = d.data();
-                const total = data.grand_total || data.total_amount || 0;
-                
-                // Table
-                if(tbodyTrx.children.length < 20) {
-                    tbodyTrx.innerHTML += `<tr><td>${new Date(data.created_at.seconds*1000).toLocaleTimeString()}</td><td>${data.order_number}</td><td>Rp ${total.toLocaleString('id-ID')}</td><td><button style="background:var(--danger); color:white; padding:5px 10px; font-size:10px;" onclick="hapusTrx('${d.id}')">VOID</button></td></tr>`;
-                }
-
-                // Dashboard
-                if(new Date(data.created_at.seconds*1000).toDateString() === today) {
-                    omzet += total; count++;
-                    const h = new Date(data.created_at.seconds*1000).getHours() + ":00";
-                    salesMap[h] = (salesMap[h]||0) + total;
-                }
-            });
-
-            document.getElementById('dash-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
-            document.getElementById('dash-count').innerText = count;
+        // --- 1. LOAD DATA DASHBOARD (REALTIME) ---
+        // Kita subscribe ke tabel orders untuk update grafik realtime
+        function loadDashboard() {
+            const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
             
-            // Update Chart
-            myChart.data.labels = Object.keys(salesMap).sort();
-            myChart.data.datasets[0].data = Object.values(salesMap);
-            myChart.update();
-        });
+            // Ambil data transaksi HARI INI saja (Biar ringan)
+            db.from('orders')
+              .select('created_at, grand_total')
+              .gte('created_at', today) // gte = Greater Than or Equal (>=)
+              .order('created_at', { ascending: true })
+              .then(({ data, error }) => {
+                  if(error) return console.error(error);
+                  
+                  let omzet = 0;
+                  let count = data.length;
+                  let salesMap = {};
 
-        // MENU & STOK
-        onSnapshot(query(collection(db, "products"), orderBy("created_at", "desc")), (snap) => {
-            const tbody = document.getElementById('tabel-menu'); tbody.innerHTML = "";
-            let low = 0;
-            snap.forEach(d => {
-                const data = d.data();
-                if((data.stock||0) < 5) low++;
-                tbody.innerHTML += `<tr><td>${data.name}</td><td>${data.category}</td><td>Rp ${data.price.toLocaleString()}</td><td style="color:${(data.stock||0)<5?'#ff4757':'#00ff88'}">${data.stock||0}</td><td><button style="padding:5px 10px; background:#f6ad55;" onclick="editMenu('${d.id}','${data.name}',${data.price},'${data.category}',${data.stock})">✏️</button> <button style="padding:5px 10px; background:#ff4757; color:white;" onclick="delMenu('${d.id}')">🗑️</button></td></tr>`;
-            });
-            document.getElementById('dash-stock').innerText = low;
-        });
+                  data.forEach(d => {
+                      omzet += d.grand_total;
+                      // Grouping per Jam untuk Grafik
+                      const jam = new Date(d.created_at).getHours() + ":00";
+                      salesMap[jam] = (salesMap[jam] || 0) + d.grand_total;
+                  });
 
-        // UTILS
+                  // Update Angka
+                  document.getElementById('dash-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
+                  document.getElementById('dash-count').innerText = count;
+
+                  // Update Grafik
+                  myChart.data.labels = Object.keys(salesMap);
+                  myChart.data.datasets[0].data = Object.values(salesMap);
+                  myChart.update();
+              });
+        }
+
+        // Subscribe Realtime biar angka dashboard gerak sendiri
+        db.channel('dashboard-updates')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+              loadDashboard(); // Refresh kalau ada order baru
+              loadTrxHistory(); // Refresh tabel riwayat
+          })
+          .subscribe();
+
+        // --- 2. LOAD DATA MENU ---
+        function loadMenu() {
+            db.from('products').select('*').order('id', { ascending: true })
+              .then(({ data, error }) => {
+                  if(error) return;
+                  
+                  const tbody = document.getElementById('tabel-menu'); 
+                  tbody.innerHTML = "";
+                  let lowStock = 0;
+
+                  data.forEach(d => {
+                      if(d.stock < 5) lowStock++;
+                      tbody.innerHTML += `
+                        <tr>
+                            <td>${d.name}</td>
+                            <td>${d.category}</td>
+                            <td>Rp ${d.price.toLocaleString()}</td>
+                            <td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td>
+                            <td>
+                                <button style="padding:5px 10px; background:#f6ad55; border:none; border-radius:5px; cursor:pointer;" onclick="editMenu(${d.id}, '${d.name}', ${d.price}, '${d.category}', ${d.stock})">✏️</button> 
+                                <button style="padding:5px 10px; background:#ff4757; color:white; border:none; border-radius:5px; cursor:pointer;" onclick="delMenu(${d.id})">🗑️</button>
+                            </td>
+                        </tr>`;
+                  });
+                  document.getElementById('dash-stock').innerText = lowStock;
+              });
+        }
+
+        // --- 3. LOAD RIWAYAT TRANSAKSI (Limit 20 Terakhir) ---
+        function loadTrxHistory() {
+            db.from('orders').select('*').order('created_at', { ascending: false }).limit(20)
+              .then(({ data }) => {
+                  const tbody = document.getElementById('tabel-transaksi'); 
+                  tbody.innerHTML = "";
+                  if(data) data.forEach(d => {
+                      tbody.innerHTML += `
+                        <tr>
+                            <td>${new Date(d.created_at).toLocaleTimeString()}</td>
+                            <td>${d.order_number}</td>
+                            <td>Rp ${d.grand_total.toLocaleString('id-ID')}</td>
+                            <td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:bold;">${d.status}</span></td>
+                        </tr>`;
+                  });
+              });
+        }
+
+        // --- UTILS & NAVIGASI ---
         window.showSection = (id) => {
             document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
             document.getElementById(id).classList.add('active');
@@ -215,21 +259,39 @@
         window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
         const cleanNum = (v) => Number(v.replace(/\./g,''));
 
-        // CRUD
+        // --- CRUD MENU (SUPABASE) ---
         const btnSave = document.getElementById('btn-simpan-menu');
+        
         btnSave.addEventListener('click', async () => {
             const id = document.getElementById('menu-id').value;
             const payload = {
                 name: document.getElementById('nama').value,
                 price: cleanNum(document.getElementById('harga').value),
                 stock: Number(document.getElementById('stok').value),
-                category: document.getElementById('kategori').value,
-                updated_at: serverTimestamp()
+                category: document.getElementById('kategori').value
             };
-            if(!payload.name) return;
-            if(id) await updateDoc(doc(db, "products", id), payload);
-            else { payload.created_at = serverTimestamp(); await addDoc(collection(db, "products"), payload); }
-            resetForm(); alert("Disimpan!");
+
+            if(!payload.name) return alert("Nama wajib diisi!");
+
+            btnSave.innerText = "Menyimpan...";
+            
+            let error;
+            if(id) {
+                // UPDATE
+                const { error: err } = await db.from('products').update(payload).eq('id', id);
+                error = err;
+            } else {
+                // INSERT
+                const { error: err } = await db.from('products').insert(payload);
+                error = err;
+            }
+
+            if(error) alert("Gagal: " + error.message);
+            else {
+                alert("Berhasil disimpan!");
+                resetForm();
+                loadMenu();
+            }
         });
 
         window.editMenu = (id, n, h, k, s) => {
@@ -238,33 +300,66 @@
             document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(h);
             document.getElementById('stok').value = s;
             document.getElementById('kategori').value = k;
-            btnSave.innerText = "UPDATE MENU"; document.getElementById('btn-batal').style.display = "inline-block";
+            btnSave.innerText = "UPDATE MENU"; 
+            document.getElementById('btn-batal').style.display = "inline-block";
         };
+
         window.resetForm = () => {
             document.getElementById('menu-id').value = ""; document.getElementById('nama').value = "";
             document.getElementById('harga').value = ""; document.getElementById('stok').value = "";
-            btnSave.innerText = "SIMPAN MENU"; document.getElementById('btn-batal').style.display = "none";
+            btnSave.innerText = "SIMPAN MENU"; 
+            document.getElementById('btn-batal').style.display = "none";
         }
-        window.delMenu = async (id) => { if(confirm("Hapus?")) await deleteDoc(doc(db, "products", id)); };
-        window.hapusTrx = async (id) => { if(prompt("PIN:")==="1234") await deleteDoc(doc(db, "orders", id)); };
 
-        // SETTINGS
-        const setRef = doc(db, "settings", "store_config");
-        getDoc(setRef).then(s => {
-            if(s.exists()) {
-                const d = s.data();
-                document.getElementById('store-name').value = d.storeName||""; document.getElementById('store-phone').value = d.storePhone||"";
-                document.getElementById('store-address').value = d.storeAddress||""; document.getElementById('store-footer').value = d.storeFooter||"";
-                document.getElementById('tax-rate').value = d.taxRate||0; document.getElementById('service-rate').value = d.serviceRate||0;
+        window.delMenu = async (id) => { 
+            if(confirm("Yakin hapus menu ini?")) {
+                await db.from('products').delete().eq('id', id);
+                loadMenu();
             }
-        });
+        };
+
+        // --- SETTINGS (SUPABASE) ---
+        // Load Settings saat buka menu
+        window.showSection = (id) => {
+            document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            if(id === 'settings') {
+                db.from('settings').select('*').single().then(({ data }) => {
+                    if(data) {
+                        document.getElementById('store-name').value = data.store_name || "";
+                        document.getElementById('store-phone').value = data.store_phone || "";
+                        document.getElementById('store-address').value = data.store_address || "";
+                        document.getElementById('store-footer').value = data.store_footer || "";
+                        document.getElementById('tax-rate').value = data.tax_rate || 0;
+                        document.getElementById('service-rate').value = data.service_rate || 0;
+                    }
+                });
+            }
+        };
+        // Biar default dashboard muncul
+        document.getElementById('dashboard').classList.add('active');
+
         window.saveSettings = async () => {
-            await setDoc(setRef, {
-                storeName: document.getElementById('store-name').value, storePhone: document.getElementById('store-phone').value,
-                storeAddress: document.getElementById('store-address').value, storeFooter: document.getElementById('store-footer').value,
-                taxRate: Number(document.getElementById('tax-rate').value), serviceRate: Number(document.getElementById('service-rate').value)
-            }); alert("Saved!");
+            const payload = {
+                store_name: document.getElementById('store-name').value,
+                store_phone: document.getElementById('store-phone').value,
+                store_address: document.getElementById('store-address').value,
+                store_footer: document.getElementById('store-footer').value,
+                tax_rate: Number(document.getElementById('tax-rate').value),
+                service_rate: Number(document.getElementById('service-rate').value)
+            };
+            
+            // Kita asumsikan settings cuma ada 1 row (id=1)
+            await db.from('settings').update(payload).eq('id', 1);
+            alert("Pengaturan disimpan!");
         }
+
+        // --- INIT ---
+        loadDashboard();
+        loadMenu();
+        loadTrxHistory();
+
     </script>
 </body>
 </html>

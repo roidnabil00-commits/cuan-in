@@ -26,47 +26,82 @@
     </style>
 </head>
 <body>
-    <h1>👨‍🍳 Kitchen Monitor</h1>
+    <h1>👨‍🍳 Kitchen Monitor (SQL)</h1>
     <div id="kitchen-container">
         <div style="text-align:center; color:#555; grid-column:1/-1;">Menunggu pesanan...</div>
     </div>
 
     <script type="module">
         import { db } from './firebase-config.js'; 
-        import { collection, onSnapshot, query, where, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const q = query(collection(db, "orders"), where("status", "==", "paid"), orderBy("created_at", "asc"));
-        
-        onSnapshot(q, (snap) => {
+        // Fungsi Load Pesanan Aktif
+        async function loadOrders() {
+            // Ambil order yang statusnya 'paid' (Sudah bayar tapi belum dimasak)
+            // Kita butuh join tabel order_items biar tahu masak apa.
+            // Di Supabase JS, cara join agak unik. Kita ambil Order dulu, lalu isi Items-nya manual/relasi.
+            
+            // 1. Ambil Data Order Utama
+            const { data: orders, error } = await db
+                .from('orders')
+                .select(`*, order_items(*)`) // Syntax magic untuk ambil detail item sekaligus!
+                .eq('status', 'paid')
+                .order('created_at', { ascending: true });
+
+            if(error) return console.error(error);
+
             const container = document.getElementById('kitchen-container');
             container.innerHTML = "";
-            if (snap.empty) container.innerHTML = '<div style="text-align:center; color:#555; grid-column:1/-1;">Menunggu pesanan...</div>';
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<div style="text-align:center; color:#555; grid-column:1/-1;">Dapur Bersih! Tidak ada pesanan.</div>';
+                return;
+            }
 
-            snap.forEach(d => {
-                const data = d.data();
-                const items = data.items.map(i => `<li><strong>${i.qty}x</strong> ${i.name}</li>`).join("");
+            orders.forEach(data => {
+                // Render List Item dari data relasi 'order_items'
+                const itemsHtml = data.order_items.map(i => 
+                    `<li><strong>${i.qty}x</strong> ${i.product_name}</li>`
+                ).join("");
+
                 const badge = (data.order_type === 'takeaway' || !data.table_number) 
                     ? `<span class="takeaway-badge">TAKEAWAY</span>` 
                     : `<span class="table-badge">MEJA ${data.table_number}</span>`;
                 
+                const time = new Date(data.created_at).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+
                 const card = document.createElement('div');
                 card.className = 'ticket';
                 card.innerHTML = `
                     <div class="ticket-header">
                         ${badge}
-                        <span style="font-size:12px; color:#aaa;">${new Date(data.created_at.seconds*1000).toLocaleTimeString()}</span>
+                        <span style="font-size:12px; color:#aaa;">${time}</span>
                     </div>
                     <div style="margin-bottom:10px; color:#ccc;">👤 ${data.customer_name}</div>
-                    <ul class="item-list">${items}</ul>
-                    <button class="btn-done" onclick="done('${d.id}')">✅ SELESAI</button>
+                    <ul class="item-list">${itemsHtml}</ul>
+                    <button class="btn-done" onclick="selesaiMasak(${data.id})">✅ SELESAI</button>
                 `;
                 container.appendChild(card);
             });
-        });
-
-        window.done = async (id) => {
-            if(confirm("Selesai masak?")) await updateDoc(doc(db, "orders", id), { status: "served" });
         }
+
+        // Fungsi Update Status jadi 'served'
+        window.selesaiMasak = async (id) => {
+            if(!confirm("Pesanan sudah diantar?")) return;
+            
+            await db.from('orders').update({ status: 'served' }).eq('id', id);
+            // Tidak perlu panggil loadOrders() karena Realtime akan otomatis menjalankannya
+        }
+
+        // Realtime Listener (Otomatis refresh kalau ada pesanan baru/selesai)
+        db.channel('kitchen-room')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+                console.log("Ada update pesanan!");
+                loadOrders();
+            })
+            .subscribe();
+
+        // Jalan pertama kali
+        loadOrders();
     </script>
 </body>
 </html>

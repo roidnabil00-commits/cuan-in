@@ -1,6 +1,4 @@
 import { db } from './firebase-config.js'; 
-import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, writeBatch, doc, getDoc } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // --- ELEMEN HTML UTAMA ---
 const daftarMenuEl = document.getElementById('daftar-menu');
@@ -33,32 +31,56 @@ const btnTutupStruk = document.getElementById('btn-tutup-struk');
 let cart = []; 
 let productsCache = {}; 
 let allProductsList = []; 
-let storeConfig = { taxRate: 0, serviceRate: 0, storeName: "CUAN-IN", storeAddress: "Loading...", storeFooter: "Terima Kasih" };
+let storeConfig = { tax_rate: 0, service_rate: 0, store_name: "CUAN-IN", store_address: "Loading...", store_footer: "Terima Kasih" };
 let currentTransaction = {}; 
 let currentMethod = 'cash'; 
 let activeCategory = 'all';
 
-// --- 0. LOAD CONFIG ---
+// --- 0. LOAD CONFIG (SUPABASE) ---
 async function loadConfig() {
     try {
-        const docSnap = await getDoc(doc(db, "settings", "store_config"));
-        if (docSnap.exists()) storeConfig = docSnap.data();
-    } catch (e) { console.error(e); }
+        const { data, error } = await db.from('settings').select('*').single();
+        if (data) storeConfig = data;
+    } catch (e) { console.error("Gagal load config:", e); }
 }
 loadConfig();
 
-// --- 1. MENU LOGIC ---
-const q = query(collection(db, "products"), orderBy("created_at", "desc"));
-onSnapshot(q, (snapshot) => {
-    allProductsList = []; productsCache = {}; 
-    snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const item = { ...data, id: docSnap.id };
-        productsCache[docSnap.id] = item;
-        allProductsList.push(item);
+// --- 1. MENU LOGIC (SUPABASE) ---
+async function fetchMenu() {
+    // Ambil data menu dari tabel 'products'
+    const { data, error } = await db
+        .from('products')
+        .select('*')
+        .order('id', { ascending: true }); // Urutkan biar rapi
+
+    if (error) {
+        console.error("Gagal ambil menu:", error);
+        return;
+    }
+
+    // Masukkan data ke variabel global
+    allProductsList = data; 
+    productsCache = {};
+    
+    // Simpan ke cache untuk keperluan Cart nanti
+    data.forEach(item => {
+        productsCache[item.id] = item;
     });
+
     renderMenu(activeCategory);
-});
+}
+
+// Fitur Realtime Supabase (Kalau stok berubah, menu refresh otomatis)
+db.channel('public:products')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+        console.log('Update Menu Realtime:', payload);
+        fetchMenu(); 
+    })
+    .subscribe();
+
+// Panggil fungsi pertama kali
+fetchMenu();
+
 
 window.filterMenu = (kategori, btnElement) => {
     activeCategory = kategori;
@@ -66,6 +88,7 @@ window.filterMenu = (kategori, btnElement) => {
     if(btnElement) {
         btnElement.classList.add('active');
     } else {
+        // Cari tombol yang sesuai teksnya (agak tricky tapi works)
         const targetBtn = Array.from(document.querySelectorAll('.cat-btn')).find(b => b.innerText.toLowerCase().includes(kategori === 'all' ? 'semua' : kategori.toLowerCase()));
         if(targetBtn) targetBtn.classList.add('active');
     }
@@ -88,11 +111,12 @@ function renderMenu(kategori) {
         const isHabis = stock <= 0;
         const card = document.createElement('div');
         card.className = 'card';
-        card.style.opacity = isHabis ? "0.5" : "1";
         
-        // --- PERBAIKAN DISINI: HAPUS BACKGROUND WHITE ---
-        // Biarkan CSS yang mengatur warnanya (Navi/Dark)
-        if(isHabis) card.style.background = "rgba(0,0,0,0.5)"; // Gelap kalau habis
+        // Visual Update kalau habis
+        if(isHabis) {
+            card.style.opacity = "0.5";
+            card.style.background = "rgba(0,0,0,0.5)";
+        }
         
         const statusText = isHabis 
             ? "<span style='color:#ff4757; font-size:12px; font-weight:bold;'>HABIS</span>" 
@@ -103,26 +127,44 @@ function renderMenu(kategori) {
             ${statusText}
             <div class="price">Rp ${data.price.toLocaleString('id-ID')}</div>
         `;
+        // Jangan lupa: Kirim ID produk saat diklik
         if (!isHabis) card.addEventListener('click', () => addToCart(data.id));
         daftarMenuEl.appendChild(card);
     });
 }
 
-// --- 2. CART LOGIC ---
+// --- 2. CART LOGIC (SAMA SEPERTI SEBELUMNYA) ---
 window.addToCart = (id) => {
+    // Pastikan ID tipe data sama (Supabase ID = number)
     const item = cart.find(i => i.id === id);
-    if ((item ? item.qty : 0) + 1 > productsCache[id].stock) return alert("Stok habis!");
-    item ? item.qty++ : cart.push({ id, name: productsCache[id].name, price: productsCache[id].price, qty: 1 });
+    const product = productsCache[id];
+    
+    if (!product) return;
+
+    if ((item ? item.qty : 0) + 1 > product.stock) return alert("Stok habis!");
+    
+    if (item) {
+        item.qty++;
+    } else {
+        cart.push({ id, name: product.name, price: product.price, qty: 1 });
+    }
     updateCartUI();
 }
 
 window.changeQty = (id, delta) => {
-    const idx = cart.findIndex(i => i.id === id);
+    // Convert ID string ke number kalau perlu (karena HTML attribute selalu string)
+    const numId = Number(id);
+    const idx = cart.findIndex(i => i.id === numId);
+    
     if (idx === -1) return;
+    
     const newQty = cart[idx].qty + delta;
+    const maxStock = productsCache[numId].stock;
+
     if (newQty <= 0) cart.splice(idx, 1);
-    else if (delta > 0 && newQty > productsCache[id].stock) return alert("Stok mentok!");
+    else if (delta > 0 && newQty > maxStock) return alert("Stok mentok!");
     else cart[idx].qty = newQty;
+    
     updateCartUI();
 }
 
@@ -146,14 +188,15 @@ function updateCartUI() {
             </div>`;
     });
     
-    const tax = subtotal * (storeConfig.taxRate / 100);
-    const service = subtotal * (storeConfig.serviceRate / 100);
+    // Pakai nama field yang sesuai tabel settings SQL (snake_case)
+    const tax = subtotal * ((storeConfig.tax_rate || 0) / 100);
+    const service = subtotal * ((storeConfig.service_rate || 0) / 100);
     const grand = subtotal + tax + service;
 
     totalPriceEl.innerHTML = `
         <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Subtotal</span><span>${subtotal.toLocaleString('id-ID')}</span></div>
-        <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Tax (${storeConfig.taxRate}%)</span><span>${tax.toLocaleString('id-ID')}</span></div>
-        <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Service (${storeConfig.serviceRate}%)</span><span>${service.toLocaleString('id-ID')}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Tax (${storeConfig.tax_rate||0}%)</span><span>${tax.toLocaleString('id-ID')}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:#ccc;"><span>Service (${storeConfig.service_rate||0}%)</span><span>${service.toLocaleString('id-ID')}</span></div>
     `;
     btnTotalLabel.innerText = "Rp " + grand.toLocaleString('id-ID');
     btnCheckout.disabled = false;
@@ -182,13 +225,13 @@ btnCheckout.addEventListener('click', () => {
     if (orderType === 'dine-in' && !tableNum) return alert("⚠️ Nomor meja wajib diisi!");
 
     const subtotal = cart.reduce((s, i) => s + (i.price * i.qty), 0);
-    const tax = subtotal * (storeConfig.taxRate / 100);
-    const service = subtotal * (storeConfig.serviceRate / 100);
+    const tax = subtotal * ((storeConfig.tax_rate||0) / 100);
+    const service = subtotal * ((storeConfig.service_rate||0) / 100);
     const grand = Math.ceil(subtotal + tax + service); 
 
     currentTransaction = {
         customer_name: custName,
-        table_number: orderType === 'takeaway' ? 0 : tableNum,
+        table_number: orderType === 'takeaway' ? '' : tableNum, // Kosongkan string kalau takeaway
         order_type: orderType,
         subtotal, tax, service, grand_total: grand,
         items: cart
@@ -258,7 +301,7 @@ window.closePayment = () => {
     modalPayment.style.display = "none";
 };
 
-// --- FINALISASI ---
+// --- 4. FINALISASI TRANSAKSI (SUPABASE) ---
 window.processFinalPayment = async () => {
     const received = cleanNum(payInput.value);
     const total = currentTransaction.grand_total;
@@ -271,43 +314,82 @@ window.processFinalPayment = async () => {
     if (!confirm("Konfirmasi pembayaran?")) return;
 
     try {
-        const nomor = "INV-" + Date.now();
-        const batch = writeBatch(db);
+        const nomorInv = "INV-" + Date.now();
         
-        currentTransaction.items.forEach(i => {
-            batch.update(doc(db, "products", i.id), { stock: productsCache[i.id].stock - i.qty });
-        });
+        // 1. Simpan Header Transaksi (Tabel 'orders')
+        const { data: orderData, error: orderError } = await db.from('orders').insert({
+            order_number: nomorInv,
+            customer_name: currentTransaction.customer_name,
+            table_number: currentTransaction.table_number,
+            order_type: currentTransaction.order_type,
+            
+            subtotal: currentTransaction.subtotal,
+            tax: currentTransaction.tax,
+            service: currentTransaction.service,
+            grand_total: currentTransaction.grand_total,
+            
+            payment_method: currentMethod,
+            amount_received: (currentMethod === 'cash' ? received : total),
+            change_amount: (currentMethod === 'cash' ? (received - total) : 0),
+            
+            status: 'paid'
+        }).select().single(); // .select().single() penting biar kita dapat ID transaksi barunya
 
-        const orderData = {
+        if (orderError) throw new Error("Gagal simpan order: " + orderError.message);
+        
+        const newOrderId = orderData.id; // Ini ID transaksi di database (contoh: 1, 2, 3...)
+
+        // 2. Simpan Detail Item & Potong Stok
+        // Kita loop satu per satu item di keranjang
+        for (const item of currentTransaction.items) {
+            
+            // Masukkan ke tabel 'order_items'
+            await db.from('order_items').insert({
+                order_id: newOrderId,
+                product_id: item.id,
+                product_name: item.name,
+                price_at_purchase: item.price,
+                qty: item.qty,
+                subtotal: item.price * item.qty
+            });
+
+            // Update Stok di tabel 'products'
+            const currentStock = productsCache[item.id].stock;
+            await db.from('products')
+                .update({ stock: currentStock - item.qty })
+                .eq('id', item.id);
+        }
+
+        // 3. Reset UI & Tampilkan Struk
+        modalPayment.style.display = "none"; 
+        
+        // Tambahkan data ID & Tanggal biar struk lengkap
+        const strukData = {
             ...currentTransaction,
-            order_number: nomor,
-            status: 'paid',
-            created_at: serverTimestamp(),
-            payment_method: currentMethod, 
-            payment_ref: currentMethod === 'edc' ? edcRef : '-', 
-            amount_received: currentMethod === 'cash' ? received : total,
-            change_amount: currentMethod === 'cash' ? (received - total) : 0
+            order_number: nomorInv,
+            amount_received: (currentMethod === 'cash' ? received : total),
+            change_amount: (currentMethod === 'cash' ? (received - total) : 0),
+            payment_ref: (currentMethod === 'edc' ? edcRef : '-'),
+            payment_method: currentMethod
         };
         
-        batch.set(doc(collection(db, "orders")), orderData);
-        await batch.commit();
-
-        modalPayment.style.display = "none"; 
-        renderStruk(orderData);
+        renderStruk(strukData);
         modalStruk.style.display = "flex"; 
         
+        // Bersihkan Form
         document.getElementById('cust-name').value = "";
         document.getElementById('table-num').value = "";
         
     } catch (e) {
-        alert("Gagal: " + e.message);
+        alert("Error Transaksi: " + e.message);
+        console.error(e);
     }
 };
 
 function renderStruk(data) {
-    document.querySelector('.struk-header h2').innerText = storeConfig.storeName || "CUAN-IN";
-    document.querySelector('.struk-header p').innerText = storeConfig.storeAddress || "";
-    document.querySelector('.struk-footer p:first-child').innerText = storeConfig.storeFooter || "Terima Kasih!";
+    document.querySelector('.struk-header h2').innerText = storeConfig.store_name || "CUAN-IN";
+    document.querySelector('.struk-header p').innerText = storeConfig.store_address || "";
+    document.querySelector('.struk-footer p:first-child').innerText = storeConfig.store_footer || "Terima Kasih!";
 
     const labelMeja = data.order_type === 'takeaway' ? "TAKEAWAY" : `Meja: ${data.table_number}`;
     

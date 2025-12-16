@@ -30,14 +30,14 @@
 
     <div class="controls" data-html2canvas-ignore="true">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2>📊 Laporan Transaksi</h2>
+            <h2>📊 Laporan Transaksi (SQL)</h2>
             <button onclick="downloadPDF()" style="background:#ff4757; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">Download PDF</button>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn-filter active" onclick="setFilter('today', this)">Hari Ini</button>
-            <button class="btn-filter" onclick="setFilter('week', this)">Minggu Ini</button>
-            <button class="btn-filter" onclick="setFilter('month', this)">Bulan Ini</button>
-            <input type="date" id="custom-date" onchange="setFilter('custom', this)" style="padding:8px; border-radius:5px; border:none;">
+            <button class="btn-filter active" onclick="loadReport('today', this)">Hari Ini</button>
+            <button class="btn-filter" onclick="loadReport('week', this)">Minggu Ini</button>
+            <button class="btn-filter" onclick="loadReport('month', this)">Bulan Ini</button>
+            <input type="date" id="custom-date" onchange="loadReport('custom', this)" style="padding:8px; border-radius:5px; border:none; color:black; background:white;">
         </div>
         <a href="admin.html" style="display:inline-block; margin-top:15px; color:#aaa; text-decoration:none;">⬅️ Kembali ke Dashboard</a>
     </div>
@@ -62,73 +62,98 @@
     </div>
 
     <script type="module">
-        import { db, auth } from './firebase-config.js'; 
-        import { collection, onSnapshot, query, orderBy, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { db } from './firebase-config.js'; 
 
-        onAuthStateChanged(auth, (u) => { if(!u) window.location.href="login.html" });
-
-        let allData = [];
-        getDoc(doc(db, "settings", "store_config")).then(s => { if(s.exists()) document.getElementById('store-name').innerText = s.data().storeName + " REPORT"; });
-
-        onSnapshot(query(collection(db, "orders"), orderBy("created_at", "desc")), (snap) => {
-            allData = [];
-            snap.forEach(d => allData.push(d.data()));
-            render('today');
+        // Load Nama Toko dari Settings
+        db.from('settings').select('*').single().then(({ data }) => {
+            if(data) document.getElementById('store-name').innerText = (data.store_name || "CUAN-IN") + " REPORT";
         });
 
-        window.setFilter = (type, btn) => {
+        window.loadReport = async (type, btn) => {
+            // UI Update
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
-            if(btn) btn.classList.add('active');
-            render(type);
-        }
+            if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
-        function render(type) {
+            // Logic Tanggal (SQL Filter)
             const today = new Date();
-            let start = new Date(today.setHours(0,0,0,0));
-            let end = new Date(today.setHours(23,59,59,999));
-            let label = "Hari Ini";
+            let startDateStr = "";
+            let label = "";
 
-            if(type === 'week') {
-                const d = start.getDay() || 7; 
-                start.setDate(start.getDate() - d + 1);
-                label = "Minggu Ini";
+            if(type === 'today') {
+                startDateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+                label = "Hari Ini (" + new Date().toLocaleDateString('id-ID') + ")";
+            } else if(type === 'week') {
+                const day = today.getDay() || 7; 
+                today.setDate(today.getDate() - day + 1); // Senin minggu ini
+                startDateStr = today.toISOString().split('T')[0];
+                label = "Minggu Ini (Sejak " + today.toLocaleDateString('id-ID') + ")";
             } else if(type === 'month') {
-                start.setDate(1);
-                label = "Bulan Ini";
+                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                startDateStr = firstDay.toISOString().split('T')[0];
+                label = "Bulan Ini (" + today.toLocaleString('id-ID', { month: 'long', year:'numeric' }) + ")";
             } else if(type === 'custom') {
-                start = new Date(document.getElementById('custom-date').value);
-                end = new Date(start); end.setHours(23,59,59);
-                label = start.toLocaleDateString();
+                const val = document.getElementById('custom-date').value;
+                if(!val) return;
+                startDateStr = val;
+                label = "Tanggal: " + val;
             }
 
-            const filtered = allData.filter(d => {
-                const t = new Date(d.created_at.seconds*1000);
-                return t >= start && t <= end;
-            });
-
             document.getElementById('period-display').innerText = label;
-            document.getElementById('print-date').innerText = new Date().toLocaleString();
-            
-            const tbody = document.getElementById('tabel-laporan'); tbody.innerHTML = "";
-            let omzet = 0;
+            document.getElementById('print-date').innerText = new Date().toLocaleString('id-ID');
 
-            filtered.forEach(d => {
-                const total = d.grand_total || d.total_amount || 0;
-                omzet += total;
-                const items = d.items.map(i => `${i.name} (${i.qty})`).join(", ");
-                const time = new Date(d.created_at.seconds*1000).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+            // QUERY KE SUPABASE (Hanya ambil data sejak startDateStr)
+            const { data, error } = await db
+                .from('orders')
+                .select(`*, order_items(*)`) // Ambil detail item juga
+                .gte('created_at', startDateStr) // GTE = Greater Than or Equal (>=)
+                .order('created_at', { ascending: false });
+
+            if(error) {
+                alert("Gagal load laporan: " + error.message);
+                return;
+            }
+
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tabel-laporan'); 
+            tbody.innerHTML = "";
+            let totalOmzet = 0;
+
+            data.forEach(d => {
+                totalOmzet += d.grand_total;
                 
-                tbody.innerHTML += `<tr><td>${time}</td><td>${d.order_number}</td><td>${d.customer_name}<br><small>${d.order_type||''}</small></td><td style="font-size:10px;">${items}</td><td>Rp ${total.toLocaleString('id-ID')}</td></tr>`;
+                // Format Item biar rapi
+                const itemsStr = d.order_items.map(i => `${i.product_name} (${i.qty})`).join(", ");
+                const time = new Date(d.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${time}</td>
+                        <td>${d.order_number}</td>
+                        <td>${d.customer_name}<br><small style="color:#888">${d.order_type}</small></td>
+                        <td style="font-size:10px;">${itemsStr}</td>
+                        <td style="font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td>
+                    </tr>`;
             });
 
-            document.getElementById('tot-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
-            document.getElementById('tot-trx').innerText = filtered.length;
+            document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
+            document.getElementById('tot-trx').innerText = data.length;
         }
 
         window.downloadPDF = () => {
-            html2pdf().set({ margin:10, filename:'Laporan.pdf', html2canvas:{scale:2}, jsPDF:{unit:'mm', format:'a4'} }).from(document.getElementById('report-area')).save();
+            const element = document.getElementById('report-area');
+            html2pdf().set({ 
+                margin: 10, 
+                filename: 'Laporan_CuanIn.pdf', 
+                html2canvas: { scale: 2 }, 
+                jsPDF: { unit: 'mm', format: 'a4' } 
+            }).from(element).save();
         }
+
+        // Load Default (Hari Ini)
+        loadReport('today', document.querySelector('.btn-filter'));
     </script>
 </body>
 </html>

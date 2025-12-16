@@ -198,11 +198,18 @@
     </div>
 
     <script type="module" src="app.js"></script>
-    <script type="module">
-        import { auth } from './firebase-config.js';
-        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
-        window.logout = () => { signOut(auth).then(() => { window.location.href = "login.html"; }); };
+    
+    <script>
+        // Cek apakah user sudah "Login" (Pura-pura login pakai localStorage)
+        const isOwner = localStorage.getItem('user_role') === 'owner';
+        
+        // Fungsi Logout
+        window.logout = () => { 
+            if(confirm("Keluar dari kasir?")) {
+                localStorage.removeItem('user_role');
+                window.location.href = "login.html"; 
+            }
+        };
     </script>
 </body>
 </html>

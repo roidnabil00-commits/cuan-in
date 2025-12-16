@@ -149,6 +149,17 @@
     </div>
 
     <script type="module">
+        if (localStorage.getItem('user_role') !== 'owner') {
+        window.location.href = "login.html";
+    }
+
+    import { db } from './firebase-config.js'; 
+    
+    // Update fungsi logout juga
+    window.logout = () => { 
+        localStorage.removeItem('user_role');
+        window.location.href = "login.html"; 
+    };
         // Import SUPABASE (Bukan Firebase lagi!)
         import { db } from './firebase-config.js'; 
 

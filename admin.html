@@ -3,57 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Cuan-in</title>
+    <title>Dashboard CEO - Cuan-in</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f4f4f4; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f0f2f5; color: #333; }
         
         /* SIDEBAR */
-        .sidebar { width: 250px; background: #333; color: white; padding: 20px; display: flex; flex-direction: column; }
-        .sidebar h2 { border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 20px; }
-        .menu-item { padding: 15px; cursor: pointer; border-radius: 5px; margin-bottom: 5px; transition: 0.3s; }
-        .menu-item:hover, .menu-item.active { background: #28a745; }
-
+        .sidebar { width: 260px; background: #1a1c23; color: #fff; display: flex; flex-direction: column; transition: 0.3s; }
+        .sidebar-header { padding: 25px 20px; border-bottom: 1px solid #2c303b; }
+        .sidebar-header h2 { margin: 0; font-size: 20px; color: #28a745; display: flex; align-items: center; gap: 10px; }
+        .menu-item { padding: 15px 25px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 15px; color: #a0aec0; }
+        .menu-item:hover, .menu-item.active { background: #2c303b; color: #fff; border-right: 4px solid #28a745; }
+        
         /* CONTENT */
         .content { flex: 1; padding: 30px; overflow-y: auto; }
-        .section { display: none; } /* Sembunyikan semua section dulu */
-        .section.active { display: block; } /* Munculkan yang aktif */
+        .section { display: none; animation: fadeIn 0.3s; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* FORMS & TABLES */
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-        button { cursor: pointer; background: #28a745; color: white; border: none; font-weight: bold; }
+        /* DASHBOARD CARDS */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; border-left: 5px solid #28a745; }
+        .stat-card h3 { margin: 0 0 10px 0; font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #2d3748; }
+        .stat-card.alert { border-left-color: #dc3545; }
+        .stat-card.alert .value { color: #dc3545; }
+
+        /* GENERAL UI */
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        h1 { margin: 0 0 25px 0; font-size: 24px; color: #1a1c23; }
+        input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
+        button { cursor: pointer; background: #28a745; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; margin-top: 10px; transition: 0.2s; }
+        button:hover { filter: brightness(1.1); }
         button.btn-danger { background: #dc3545; }
-        button.btn-edit { background: #ffc107; color: black; }
+        button.btn-edit { background: #f6ad55; color: #fff; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
-        th { background: #eee; }
-        
-        /* Utility */
-        .row { display: flex; gap: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f7fafc; color: #718096; font-size: 13px; text-transform: uppercase; }
+        .row { display: flex; gap: 15px; }
+        .half { flex: 1; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <h2>⚙️ Admin Panel</h2>
-        <div class="menu-item active" onclick="showSection('menu-manager')">🍔 Kelola Menu</div>
-        <div class="menu-item" onclick="showSection('transaksi-manager')">🧾 Kelola Transaksi</div>
-        <div class="menu-item" onclick="window.location.href='laporan.html'">📊 Lihat Laporan</div>
-        <div class="menu-item" onclick="window.location.href='index.html'">⬅️ Kembali ke Kasir</div>
-        <div class="menu-item" onclick="logout()" style="background: #dc3545;">🚪 Logout</div>
+        <div class="sidebar-header">
+            <h2>🚀 CUAN-IN <span style="font-size:12px; color:#666; margin-left:auto;">Admin</span></h2>
+        </div>
+        <div class="menu-item active" onclick="showSection('dashboard-section')">📊 Dashboard</div>
+        <div class="menu-item" onclick="showSection('menu-manager')">🍔 Kelola Menu</div>
+        <div class="menu-item" onclick="showSection('transaksi-manager')">🧾 Riwayat Order</div>
+        <div class="menu-item" onclick="showSection('settings-manager')">🏢 Pengaturan</div>
+        <div class="menu-item" onclick="window.location.href='index.html'">⬅️ Ke Mesin Kasir</div>
+        <div class="menu-item" onclick="logout()" style="margin-top: auto; background: #2d3748;">🚪 Logout</div>
     </div>
 
     <div class="content">
         
-        <div id="menu-manager" class="section active">
-            <h1>🍔 Manajemen Menu</h1>
+        <div id="dashboard-section" class="section active">
+            <h1>Selamat Datang, Owner! 👋</h1>
             
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <h3>Omzet Hari Ini</h3>
+                    <div class="value" id="dash-omzet">Rp 0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Pesanan</h3>
+                    <div class="value" id="dash-count">0</div>
+                </div>
+                <div class="stat-card alert">
+                    <h3>Stok Menipis (< 5)</h3>
+                    <div class="value" id="dash-stock">0 Item</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>📈 Tren Penjualan (Live)</h3>
+                    <span style="font-size:12px; color:#888;">Data Hari Ini</span>
+                </div>
+                <canvas id="salesChart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+
+        <div id="menu-manager" class="section">
+            <h1>🍔 Manajemen Menu & Stok</h1>
             <div class="card">
                 <h3>Form Menu</h3>
-                <input type="hidden" id="menu-id"> <div class="row">
-                    <input type="text" id="nama" placeholder="Nama Menu (Contoh: Kopi Hitam)" required>
-                    <input type="number" id="harga" placeholder="Harga (Contoh: 15000)" required>
+                <input type="hidden" id="menu-id"> 
+                <div class="row">
+                    <input type="text" id="nama" placeholder="Nama Menu" class="half">
+                    <input type="text" id="harga" placeholder="Harga (Rp)" class="half" onkeyup="formatRupiah(this)">
+                    <input type="number" id="stok" placeholder="Stok" class="half">
                 </div>
                 <select id="kategori">
                     <option value="Coffee">Coffee</option>
@@ -62,212 +105,242 @@
                     <option value="Snack">Snack</option>
                 </select>
                 <button id="btn-simpan-menu">SIMPAN MENU</button>
-                <button id="btn-batal" style="background: #666; display: none;" onclick="resetForm()">BATAL EDIT</button>
+                <button id="btn-batal" style="background: #718096; display: none;" onclick="resetForm()">BATAL</button>
             </div>
-
             <div class="card">
-                <h3>Daftar Menu Saat Ini</h3>
                 <table>
-                    <thead>
-                        <tr>
-                            <th>Nama</th>
-                            <th>Kategori</th>
-                            <th>Harga</th>
-                            <th>Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabel-menu">
-                        </tbody>
+                    <thead><tr><th>Menu</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Aksi</th></tr></thead>
+                    <tbody id="tabel-menu"></tbody>
                 </table>
             </div>
         </div>
 
         <div id="transaksi-manager" class="section">
-            <h1>🧾 Riwayat Transaksi (Hapus/Void)</h1>
+            <h1>🧾 Riwayat Transaksi</h1>
             <div class="card">
-                <p>⚠️ Hati-hati, menghapus transaksi akan mengubah total omzet di laporan.</p>
                 <table>
-                    <thead>
-                        <tr>
-                            <th>Waktu</th>
-                            <th>No. Order</th>
-                            <th>Total</th>
-                            <th>Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabel-transaksi">
-                        </tbody>
+                    <thead><tr><th>Waktu</th><th>No. Order</th><th>Total</th><th>Aksi</th></tr></thead>
+                    <tbody id="tabel-transaksi"></tbody>
                 </table>
+            </div>
+        </div>
+
+        <div id="settings-manager" class="section">
+            <h1>🏢 Pengaturan Toko</h1>
+            <div class="card">
+                <div class="row">
+                    <input type="text" id="store-name" placeholder="Nama Toko" class="half">
+                    <input type="text" id="store-phone" placeholder="No. HP" class="half">
+                </div>
+                <textarea id="store-address" rows="3" placeholder="Alamat"></textarea>
+                <input type="text" id="store-footer" placeholder="Footer Struk">
+                <div class="row">
+                    <div class="half"><label>Pajak (%)</label><input type="number" id="tax-rate" value="0"></div>
+                    <div class="half"><label>Service (%)</label><input type="number" id="service-rate" value="0"></div>
+                </div>
+                <button onclick="saveSettings()">💾 SIMPAN PENGATURAN</button>
             </div>
         </div>
 
     </div>
 
     <script type="module">
-        import { db, auth } from './firebase-config.js'; // PASTIKAN ADA AUTH
-        import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } 
+        import { db, auth } from './firebase-config.js'; 
+        import { collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, onSnapshot, query, orderBy, serverTimestamp, where } 
         from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        
-        // --- TAMBAHAN KODE KEAMANAN (WAJIB) ---
         import { onAuthStateChanged, signOut } 
         from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // 1. Cek Login (Satpam)
+        // --- AUTH CHECK ---
         onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                alert("⚠️ Hayo mau ngapain? Login dulu!");
-                window.location.href = "login.html";
-            }
+            if (!user) { window.location.href = "login.html"; }
+        });
+        window.logout = () => { signOut(auth).then(() => { window.location.href = "login.html"; }); };
+
+        // --- GLOBAL UTILS ---
+        window.showSection = (id) => {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            // Highlight sidebar active
+            const items = document.querySelectorAll('.menu-item');
+            if(id === 'dashboard-section') items[0].classList.add('active');
+            if(id === 'menu-manager') items[1].classList.add('active');
+            if(id === 'transaksi-manager') items[2].classList.add('active');
+            if(id === 'settings-manager') items[3].classList.add('active');
+        };
+
+        window.formatRupiah = (input) => {
+            let value = input.value.replace(/\D/g, "");
+            input.value = new Intl.NumberFormat('id-ID').format(value);
+        };
+        const cleanNumber = (val) => Number(val.replace(/\./g, ""));
+
+        // ==========================================
+        // 📊 DASHBOARD LOGIC (CHART.JS)
+        // ==========================================
+        let myChart = null;
+
+        function initChart() {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [], // Jam 08:00, 09:00, dll
+                    datasets: [{
+                        label: 'Penjualan (Rp)',
+                        data: [],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+        initChart(); // Jalankan chart kosong dulu
+
+        // LISTEN ORDERS (Dashboard & Transaksi)
+        const qOrder = query(collection(db, "orders"), orderBy("created_at", "desc"));
+        onSnapshot(qOrder, (snapshot) => {
+            // A. Update Tabel Transaksi
+            const tbody = document.getElementById('tabel-transaksi');
+            tbody.innerHTML = "";
+            
+            // B. Variabel Dashboard
+            let omzetHariIni = 0;
+            let orderHariIni = 0;
+            const today = new Date().toDateString();
+            
+            // Data Grafik (Per Jam)
+            const salesPerHour = {}; 
+
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const total = data.grand_total ? data.grand_total : data.total_amount;
+                
+                // 1. Render Tabel (Cuma 50 terakhir biar gak berat)
+                if (tbody.children.length < 50) {
+                    const jam = data.created_at ? new Date(data.created_at.seconds * 1000).toLocaleTimeString('id-ID') : '-';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${jam}</td><td>${data.order_number}</td>
+                            <td>Rp ${total.toLocaleString('id-ID')}</td>
+                            <td><button class="btn-danger" style="padding:5px 10px; font-size:12px; margin:0;" onclick="hapusTransaksi('${docSnap.id}')">Void</button></td>
+                        </tr>`;
+                }
+
+                // 2. Hitung Dashboard (Hanya Data HARI INI)
+                if (data.created_at) {
+                    const dateObj = new Date(data.created_at.seconds * 1000);
+                    if (dateObj.toDateString() === today) {
+                        omzetHariIni += total;
+                        orderHariIni += 1;
+
+                        // Kelompokkan per jam untuk Grafik
+                        const hour = dateObj.getHours() + ":00";
+                        salesPerHour[hour] = (salesPerHour[hour] || 0) + total;
+                    }
+                }
+            });
+
+            // Update Kartu Dashboard
+            document.getElementById('dash-omzet').innerText = "Rp " + omzetHariIni.toLocaleString('id-ID');
+            document.getElementById('dash-count').innerText = orderHariIni;
+
+            // Update Grafik Chart.js
+            const sortedHours = Object.keys(salesPerHour).sort();
+            const sortedValues = sortedHours.map(h => salesPerHour[h]);
+            
+            myChart.data.labels = sortedHours.length > 0 ? sortedHours : ["Belum ada data"];
+            myChart.data.datasets[0].data = sortedValues.length > 0 ? sortedValues : [0];
+            myChart.update();
         });
 
-        // 2. Fungsi Logout
-        window.logout = () => {
-            signOut(auth).then(() => {
-                window.location.href = "login.html";
-            });
-        };
-        // ----------------------------------------
-
-        // --- NAVIGASI SIDEBAR ---
-        window.showSection = (id) => {
-            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        // ... (Kode admin sisanya biarkan sama seperti sebelumnya) ...
-        // (Pastikan kamu copy-paste ulang logika menu & transaksi di bawah sini kalau terhapus)
-        // --- NAVIGASI SIDEBAR ---
-        window.showSection = (id) => {
-            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        // ==========================
-        // 1. LOGIC KELOLA MENU
-        // ==========================
-        const formId = document.getElementById('menu-id');
-        const formNama = document.getElementById('nama');
-        const formHarga = document.getElementById('harga');
-        const formKategori = document.getElementById('kategori');
-        const btnSimpan = document.getElementById('btn-simpan-menu');
-        const btnBatal = document.getElementById('btn-batal');
-
-        // READ (Baca Data Menu)
+        // LISTEN PRODUCTS (Stok Dashboard & Menu Manager)
         const qMenu = query(collection(db, "products"), orderBy("created_at", "desc"));
         onSnapshot(qMenu, (snapshot) => {
             const tbody = document.getElementById('tabel-menu');
             tbody.innerHTML = "";
+            let lowStockCount = 0;
+
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
-                const row = `
-                    <tr>
-                        <td>${data.name}</td>
-                        <td>${data.category}</td>
-                        <td>Rp ${data.price.toLocaleString('id-ID')}</td>
-                        <td>
-                            <button class="btn-edit" onclick="editMenu('${docSnap.id}', '${data.name}', ${data.price}, '${data.category}')">Edit</button>
-                            <button class="btn-danger" onclick="hapusMenu('${docSnap.id}', '${data.name}')">Hapus</button>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-        });
-
-        // CREATE & UPDATE (Simpan Menu)
-        btnSimpan.addEventListener('click', async () => {
-            if(!formNama.value || !formHarga.value) return alert("Isi nama dan harga!");
-            
-            btnSimpan.innerText = "Menyimpan...";
-            try {
-                const data = {
-                    name: formNama.value,
-                    price: Number(formHarga.value),
-                    category: formKategori.value,
-                    updated_at: serverTimestamp()
-                };
-
-                if (formId.value) {
-                    // MODE EDIT
-                    await updateDoc(doc(db, "products", formId.value), data);
-                    alert("✅ Menu berhasil diupdate!");
-                } else {
-                    // MODE BARU
-                    data.created_at = serverTimestamp();
-                    data.is_active = true;
-                    await addDoc(collection(db, "products"), data);
-                    alert("✅ Menu baru ditambahkan!");
-                }
-                resetForm();
-            } catch (error) {
-                alert("Error: " + error.message);
-            }
-            btnSimpan.innerText = "SIMPAN MENU";
-        });
-
-        // FUNGSI BANTUAN (Global Scope biar bisa dipanggil dari HTML onclick)
-        window.editMenu = (id, nama, harga, kategori) => {
-            formId.value = id;
-            formNama.value = nama;
-            formHarga.value = harga;
-            formKategori.value = kategori;
-            btnSimpan.innerText = "UPDATE MENU";
-            btnBatal.style.display = "block";
-            window.scrollTo(0,0); // Scroll ke atas
-        };
-
-        window.hapusMenu = async (id, nama) => {
-            if(confirm(`Yakin mau hapus menu "${nama}"?`)) {
-                await deleteDoc(doc(db, "products", id));
-            }
-        };
-
-        window.resetForm = () => {
-            formId.value = "";
-            formNama.value = "";
-            formHarga.value = "";
-            btnSimpan.innerText = "SIMPAN MENU";
-            btnBatal.style.display = "none";
-        };
-
-        // ==========================
-        // 2. LOGIC KELOLA TRANSAKSI
-        // ==========================
-        const qOrder = query(collection(db, "orders"), orderBy("created_at", "desc"));
-        onSnapshot(qOrder, (snapshot) => {
-            const tbody = document.getElementById('tabel-transaksi');
-            tbody.innerHTML = "";
-            snapshot.forEach((docSnap) => {
-                const data = docSnap.data();
-                const jam = data.created_at ? new Date(data.created_at.seconds * 1000).toLocaleTimeString('id-ID') : '-';
+                const stok = data.stock !== undefined ? data.stock : 0;
                 
+                // Hitung Stok Kritis
+                if (stok < 5) lowStockCount++;
+
                 const row = `
                     <tr>
-                        <td>${jam}</td>
-                        <td>${data.order_number}</td>
-                        <td>Rp ${data.total_amount.toLocaleString('id-ID')}</td>
+                        <td>${data.name}</td><td>${data.category}</td>
+                        <td>Rp ${data.price.toLocaleString('id-ID')}</td>
+                        <td style="color:${stok < 5 ? 'red':'green'}; font-weight:bold;">${stok}</td>
                         <td>
-                            <button class="btn-danger" onclick="hapusTransaksi('${docSnap.id}')">Void / Hapus</button>
+                            <button class="btn-edit" style="margin:0; padding:5px 10px;" onclick="editMenu('${docSnap.id}', '${data.name}', ${data.price}, '${data.category}', ${stok})">✏️</button>
+                            <button class="btn-danger" style="margin:0; padding:5px 10px;" onclick="hapusMenu('${docSnap.id}', '${data.name}')">🗑️</button>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
                 tbody.innerHTML += row;
             });
+            document.getElementById('dash-stock').innerText = lowStockCount + " Item";
         });
 
-        window.hapusTransaksi = async (id) => {
-            // Biasanya di POS butuh password admin, tapi ini kita bikin simple dulu
-            const password = prompt("Masukkan PIN Admin untuk menghapus transaksi ini:");
-            if (password === "1234") { // PIN SEMENTARA
-                await deleteDoc(doc(db, "orders", id));
-                alert("Transaksi dihapus.");
-            } else {
-                alert("PIN Salah!");
-            }
-        };
+        // --- LOGIC CRUD LAINNYA (SAMA) ---
+        // (Saya ringkas biar rapi, fungsinya tetap sama)
+        const formId = document.getElementById('menu-id');
+        const btnSimpan = document.getElementById('btn-simpan-menu');
+        
+        btnSimpan.addEventListener('click', async () => {
+            const nama = document.getElementById('nama').value;
+            const harga = cleanNumber(document.getElementById('harga').value);
+            const stok = document.getElementById('stok').value;
+            const kat = document.getElementById('kategori').value;
+            if(!nama || !harga || !stok) return alert("Lengkapi data!");
 
+            const payload = { name: nama, price: harga, stock: Number(stok), category: kat, updated_at: serverTimestamp() };
+            try {
+                if (formId.value) await updateDoc(doc(db, "products", formId.value), payload);
+                else { payload.created_at = serverTimestamp(); await addDoc(collection(db, "products"), payload); }
+                alert("✅ Berhasil!"); resetForm();
+            } catch (e) { alert(e.message); }
+        });
+
+        window.editMenu = (id, n, h, k, s) => {
+            formId.value = id; document.getElementById('nama').value = n;
+            document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(h);
+            document.getElementById('stok').value = s; document.getElementById('kategori').value = k;
+            btnSimpan.innerText = "UPDATE"; document.getElementById('btn-batal').style.display = "inline-block";
+            window.scrollTo(0,0);
+        };
+        window.resetForm = () => {
+            formId.value = ""; document.getElementById('nama').value = ""; document.getElementById('harga').value = ""; document.getElementById('stok').value = "";
+            btnSimpan.innerText = "SIMPAN MENU"; document.getElementById('btn-batal').style.display = "none";
+        };
+        window.hapusMenu = async (id, n) => { if(confirm("Hapus " + n + "?")) await deleteDoc(doc(db, "products", id)); };
+        window.hapusTransaksi = async (id) => { if(prompt("PIN Admin:")==="1234") await deleteDoc(doc(db, "orders", id)); else alert("Salah!"); };
+
+        // SETTINGS
+        const settingsRef = doc(db, "settings", "store_config");
+        getDoc(settingsRef).then(snap => {
+            if(snap.exists()) {
+                const d = snap.data();
+                document.getElementById('store-name').value = d.storeName||""; document.getElementById('store-phone').value = d.storePhone||"";
+                document.getElementById('store-address').value = d.storeAddress||""; document.getElementById('store-footer').value = d.storeFooter||"";
+                document.getElementById('tax-rate').value = d.taxRate||0; document.getElementById('service-rate').value = d.serviceRate||0;
+            }
+        });
+        window.saveSettings = async () => {
+            const d = {
+                storeName: document.getElementById('store-name').value, storePhone: document.getElementById('store-phone').value,
+                storeAddress: document.getElementById('store-address').value, storeFooter: document.getElementById('store-footer').value,
+                taxRate: Number(document.getElementById('tax-rate').value), serviceRate: Number(document.getElementById('service-rate').value)
+            };
+            await setDoc(settingsRef, d); alert("✅ Tersimpan!");
+        };
     </script>
 </body>
 </html>

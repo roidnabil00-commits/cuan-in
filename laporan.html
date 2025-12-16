@@ -6,7 +6,7 @@
     <title>Laporan Transaksi - Cuan-in</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; max-width: 1000px; margin: 0 auto; color: #333; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; max-width: 1100px; margin: 0 auto; color: #333; }
         
         /* HEADER & KONTROL */
         .controls-area { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -36,14 +36,14 @@
 
         /* Tabel */
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; vertical-align: top; }
         th { background-color: #2d3748; color: white; font-weight: 600; text-transform: uppercase; font-size: 12px; }
         tr:nth-child(even) { background-color: #f9fafb; }
         
         .badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; display: inline-block; margin-top: 2px; }
-        .bg-green { background-color: #c6f6d5; color: #22543d; } /* Tunai */
-        .bg-yellow { background-color: #fefcbf; color: #744210; } /* Takeaway */
-        .bg-blue { background-color: #bee3f8; color: #2b6cb0; } /* QRIS/EDC */
+        .bg-green { background-color: #c6f6d5; color: #22543d; } 
+        .bg-yellow { background-color: #fefcbf; color: #744210; } 
+        .bg-blue { background-color: #bee3f8; color: #2b6cb0; } 
         .bg-gray { background-color: #edf2f7; color: #4a5568; }
 
         /* Nav */
@@ -98,14 +98,15 @@
         <table>
             <thead>
                 <tr>
-                    <th>Waktu</th>
-                    <th>No. Order</th>
-                    <th>Pelanggan</th>
-                    <th>Metode Bayar</th> <th>Total</th>
+                    <th width="15%">Waktu</th>
+                    <th width="15%">No. Order</th>
+                    <th width="20%">Pelanggan</th>
+                    <th width="25%">Menu Items</th> <th width="10%">Metode</th>
+                    <th width="15%">Total</th>
                 </tr>
             </thead>
             <tbody id="tabel-laporan">
-                <tr><td colspan="5" style="text-align: center; padding: 20px;">Memuat data...</td></tr>
+                <tr><td colspan="6" style="text-align: center; padding: 20px;">Memuat data...</td></tr>
             </tbody>
         </table>
         
@@ -201,7 +202,7 @@
             let grandTotal = 0;
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Tidak ada transaksi di periode ini.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#888;">Tidak ada transaksi di periode ini.</td></tr>';
                 updateSummary(0, 0);
                 return;
             }
@@ -222,9 +223,9 @@
                     infoPelanggan += `<br><span class="badge bg-gray">Meja ${order.table_number}</span>`;
                 }
 
-                // Info Pembayaran (NEW LOGIC)
+                // Info Pembayaran
                 let badgeBayar = '<span class="badge bg-gray">?</span>';
-                let method = order.payment_method || 'cash'; // fallback ke cash kalau data lama
+                let method = order.payment_method || 'cash';
                 
                 if(method === 'cash') badgeBayar = '<span class="badge bg-green">TUNAI</span>';
                 else if(method === 'qris') badgeBayar = '<span class="badge bg-blue">QRIS</span>';
@@ -235,12 +236,20 @@
                     refInfo = `<br><small style="color:#666; font-size:10px;">Ref: ${order.payment_ref}</small>`;
                 }
 
+                // ITEM PRODUK (YANG TADI HILANG)
+                const menuList = order.items.map(i => `
+                    <div style="margin-bottom:3px;">
+                        • ${i.name} <span style="color:#666; font-size:11px;">x${i.qty}</span>
+                    </div>
+                `).join("");
+
                 tbody.innerHTML += `
                     <tr>
                         <td>${tgl} <br> <small style="color:#888">${jam}</small></td>
                         <td>${order.order_number}</td>
                         <td>${infoPelanggan}</td>
-                        <td>${badgeBayar} ${refInfo}</td> <td style="font-weight:bold;">Rp ${total.toLocaleString('id-ID')}</td>
+                        <td style="font-size:12px; line-height:1.4;">${menuList}</td> <td>${badgeBayar} ${refInfo}</td>
+                        <td style="font-weight:bold;">Rp ${total.toLocaleString('id-ID')}</td>
                     </tr>
                 `;
             });

@@ -30,46 +30,53 @@
             <input type="password" id="password" placeholder="Password" required>
             <button type="submit" id="btn-login" style="margin-top: 10px;">MASUK</button>
         </form>
-        
-        <p style="font-size:10px; color:#aaa; margin-top:20px;">*Gunakan akun admin lokal</p>
     </div>
 
-    <script>
+    <script type="module">
+        // Import Auth dari Supabase
+        import { auth } from './db-config.js'; 
+
         const loginForm = document.getElementById('login-form');
         const errorMsg = document.getElementById('error-msg');
         const btnLogin = document.getElementById('btn-login');
 
-        // --- PASSWORD RAHASIA KITA ---
-        // Nanti kalau mau ganti, ubah saja bagian ini
-        const AKUN_RAHASIA = {
-            email: "admin@cuan.in",
-            pass: "admin123" 
-        };
-
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
+            // UI Loading
             btnLogin.innerText = "Memproses...";
             btnLogin.disabled = true;
+            errorMsg.style.display = "none";
 
-            setTimeout(() => {
-                // Cek apakah email & password cocok?
-                if (email === AKUN_RAHASIA.email && password === AKUN_RAHASIA.pass) {
-                    // BERHASIL: Simpan "tiket" login di browser
-                    localStorage.setItem('user_role', 'owner');
-                    
-                    // Pindah ke halaman Admin
-                    window.location.href = "admin.html";
-                } else {
-                    // GAGAL
-                    errorMsg.style.display = "block";
-                    errorMsg.innerText = "❌ Email atau Password Salah!";
-                    btnLogin.innerText = "MASUK";
-                    btnLogin.disabled = false;
-                }
-            }, 800); // Pura-pura loading biar keren dikit
+            try {
+                // 1. Cek Login ke Server Supabase
+                const { data, error } = await auth.signInWithPassword({
+                    email: email,
+                    password: password,
+                });
+
+                if (error) throw error;
+
+                // 2. Jika Berhasil
+                console.log("Login Sukses:", data);
+                localStorage.setItem('user_role', 'owner'); 
+                window.location.href = "admin.html";
+
+            } catch (error) {
+                // 3. Jika Gagal
+                console.error("Login Gagal:", error);
+                
+                let pesan = "❌ Email atau Password Salah!";
+                if(error.message.includes("Email not confirmed")) pesan = "⚠️ Email belum dikonfirmasi! Cek inbox emailmu.";
+                if(error.message.includes("Invalid login")) pesan = "❌ Akun tidak ditemukan / Password salah.";
+
+                errorMsg.style.display = "block";
+                errorMsg.innerText = pesan;
+                btnLogin.innerText = "MASUK";
+                btnLogin.disabled = false;
+            }
         });
     </script>
 </body>

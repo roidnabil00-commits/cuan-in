@@ -87,7 +87,43 @@
         /* BUTTONS */
         .btn-logout { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 5px 15px; border-radius: 20px; cursor: pointer; }
         .btn-clear { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; text-decoration: underline; }
-    </style>
+        
+        /* --- CSS KHUSUS PRINT (TAMBAHKAN INI) --- */
+@media print {
+    /* Sembunyikan semua elemen utama */
+    body * {
+        visibility: hidden; 
+    }
+    
+    /* Munculkan hanya Modal Struk */
+    #modal-struk, #modal-struk * {
+        visibility: visible;
+    }
+
+    /* Atur posisi struk biar pas di kertas */
+    #modal-struk {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        background: white; /* Paksa background putih */
+        color: black;
+        backdrop-filter: none;
+    }
+
+    /* Sembunyikan tombol Print & Tutup saat nge-print */
+    #modal-struk button {
+        display: none !important;
+    }
+
+    /* Hilangkan margin browser biar kertas pas */
+    @page {
+        margin: 0;
+        size: auto; 
+    }
+}
+   </style>
 </head>
 <body>
 

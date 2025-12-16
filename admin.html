@@ -7,14 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-main: #1a1a2e;
-            --bg-panel: #16213e;
-            --text: #fff;
-            --accent: #0f3460;
-            --neon: #e94560;
-            --green: #00ff88;
-        }
+        :root { --bg-main: #1a1a2e; --bg-panel: #16213e; --text: #fff; --accent: #0f3460; --neon: #e94560; --green: #00ff88; }
         body { font-family: 'Poppins', sans-serif; background: var(--bg-main); color: var(--text); margin: 0; display: flex; height: 100vh; }
         
         /* SIDEBAR */
@@ -38,62 +31,41 @@
 
         /* TABLES & FORMS */
         .panel { background: var(--bg-panel); padding: 25px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
-        h1, h2, h3 { margin-top: 0; }
-        
         input, select, textarea { width: 100%; padding: 12px; background: var(--bg-main); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 8px; margin-bottom: 10px; outline: none; }
-        input:focus { border-color: var(--neon); }
-        
         button { padding: 12px 25px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; }
-        .btn-primary { background: var(--neon); color: white; box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3); }
-        .btn-primary:hover { box-shadow: 0 6px 20px rgba(233, 69, 96, 0.5); transform: translateY(-2px); }
-        
+        .btn-primary { background: var(--neon); color: white; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th { text-align: left; padding: 15px; color: rgba(255,255,255,0.5); font-size: 12px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); }
         td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        tr:hover td { background: rgba(255,255,255,0.02); }
-        
-        .row { display: flex; gap: 15px; }
-        .half { flex: 1; }
+        .row { display: flex; gap: 15px; } .half { flex: 1; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
         <div class="brand">🚀 CUAN-IN</div>
-        <div class="menu-item active" onclick="showSection('dashboard')">📊 Dashboard</div>
-        <div class="menu-item" onclick="showSection('menu-mgr')">🍔 Kelola Menu</div>
-        <div class="menu-item" onclick="showSection('trx-mgr')">🧾 Riwayat</div>
-        <div class="menu-item" onclick="window.location.href='laporan.html'">📄 Laporan</div>
-        <div class="menu-item" onclick="showSection('settings')">🏢 Pengaturan</div>
-        <div class="menu-item" onclick="window.location.href='index.html'" style="margin-top:auto;">⬅️ Ke Kasir</div>
-        <div class="menu-item" onclick="logout()" style="color:var(--neon);">🚪 Logout</div>
+        <div class="menu-item active" onclick="showSection('dashboard', this)">Dashboard</div>
+        <div class="menu-item" onclick="showSection('menu-mgr', this)">Kelola Menu</div>
+        <div class="menu-item" onclick="showSection('trx-mgr', this)">Riwayat</div>
+        <div class="menu-item" onclick="window.location.href='laporan.html'">Laporan</div>
+        <div class="menu-item" onclick="showSection('settings', this)">Pengaturan</div>
+        <div class="menu-item" onclick="window.location.href='index.html'" style="margin-top:auto;">Kasir</div>
+        <div class="menu-item" onclick="logout()" style="color:var(--neon);">Logout</div>
     </div>
 
     <div class="content">
         <div id="dashboard" class="section active">
-            <h1 style="margin-bottom:30px;">Dashboard Owner</h1>
+            <h1>Dashboard Owner</h1>
             <div class="grid-stats">
-                <div class="card-stat">
-                    <div class="stat-label">Omzet Hari Ini</div>
-                    <div class="stat-val" id="dash-omzet" style="color:var(--green);">Rp 0</div>
-                </div>
-                <div class="card-stat">
-                    <div class="stat-label">Total Transaksi</div>
-                    <div class="stat-val" id="dash-count">0</div>
-                </div>
-                <div class="card-stat">
-                    <div class="stat-label">Stok Menipis</div>
-                    <div class="stat-val" id="dash-stock" style="color:var(--neon);">0</div>
-                </div>
+                <div class="card-stat"><div class="stat-label">Omzet Hari Ini</div><div class="stat-val" id="dash-omzet" style="color:var(--green);">Rp 0</div></div>
+                <div class="card-stat"><div class="stat-label">Total Transaksi</div><div class="stat-val" id="dash-count">0</div></div>
+                <div class="card-stat"><div class="stat-label">Stok Menipis</div><div class="stat-val" id="dash-stock" style="color:var(--neon);">0</div></div>
             </div>
-            <div class="panel">
-                <h3>📈 Grafik Penjualan (Live)</h3>
-                <canvas id="salesChart" style="max-height:300px;"></canvas>
-            </div>
+            <div class="panel"><h3>📈 Grafik Penjualan</h3><canvas id="salesChart" style="max-height:300px;"></canvas></div>
         </div>
 
         <div id="menu-mgr" class="section">
-            <h1 style="margin-bottom:20px;">Kelola Menu</h1>
+            <h1>Kelola Menu</h1>
             <div class="panel">
                 <input type="hidden" id="menu-id">
                 <div class="row">
@@ -121,7 +93,7 @@
         </div>
 
         <div id="trx-mgr" class="section">
-            <h1>Riwayat Transaksi (Terbaru)</h1>
+            <h1>Riwayat Transaksi</h1>
             <div class="panel">
                 <table>
                     <thead><tr><th>Waktu</th><th>Order ID</th><th>Total</th><th>Status</th></tr></thead>
@@ -133,226 +105,126 @@
         <div id="settings" class="section">
             <h1>Pengaturan Toko</h1>
             <div class="panel">
-                <div class="row">
-                    <input type="text" id="store-name" placeholder="Nama Toko" class="half">
-                    <input type="text" id="store-phone" placeholder="No HP" class="half">
-                </div>
+                <div class="row"><input type="text" id="store-name" placeholder="Nama Toko" class="half"><input type="text" id="store-phone" placeholder="No HP" class="half"></div>
                 <textarea id="store-address" rows="3" placeholder="Alamat"></textarea>
                 <input type="text" id="store-footer" placeholder="Pesan Struk">
-                <div class="row">
-                    <div class="half"><label>Tax (%)</label><input type="number" id="tax-rate"></div>
-                    <div class="half"><label>Service (%)</label><input type="number" id="service-rate"></div>
-                </div>
+                <div class="row"><div class="half"><label>Tax (%)</label><input type="number" id="tax-rate"></div><div class="half"><label>Service (%)</label><input type="number" id="service-rate"></div></div>
                 <button class="btn-primary" onclick="saveSettings()">SIMPAN PENGATURAN</button>
             </div>
         </div>
     </div>
 
     <script type="module">
-        if (localStorage.getItem('user_role') !== 'owner') {
-        window.location.href = "login.html";
-    }
-
-    import { db } from './firebase-config.js'; 
-    
-    // Update fungsi logout juga
-    window.logout = () => { 
-        localStorage.removeItem('user_role');
-        window.location.href = "login.html"; 
-    };
-        // Import SUPABASE (Bukan Firebase lagi!)
         import { db } from './firebase-config.js'; 
 
-        // Untuk sementara Auth dimatikan dulu biar gampang testing
-        window.logout = () => { window.location.href = "login.html"; };
+        // --- AUTH CHECK ---
+        if (localStorage.getItem('user_role') !== 'owner') window.location.href = "login.html";
 
-        // --- CHART JS SETUP ---
+        // --- GLOBAL FUNCTIONS (WAJIB ADA BIAR TOMBOL HTML BISA KLIK) ---
+        window.logout = () => { localStorage.removeItem('user_role'); window.location.href = "login.html"; };
+        
+        window.showSection = (id, btn) => {
+            document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            // Highlight sidebar
+            if(btn) {
+                document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
+                btn.classList.add('active');
+            }
+
+            if(id === 'settings') loadSettings(); 
+        };
+
+        window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
+        const cleanNum = (v) => Number(v.replace(/\./g,''));
+
+        // --- CHART ---
         let myChart = new Chart(document.getElementById('salesChart'), {
             type: 'line',
             data: { labels: [], datasets: [{ label: 'Sales', data: [], borderColor: '#00ff88', tension: 0.4 }] },
             options: { plugins: { legend: {display:false} }, scales: { y: { grid: { color: 'rgba(255,255,255,0.1)' } } } }
         });
 
-        // --- 1. LOAD DATA DASHBOARD (REALTIME) ---
-        // Kita subscribe ke tabel orders untuk update grafik realtime
+        // --- LOGIC UTAMA ---
         function loadDashboard() {
-            const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
-            
-            // Ambil data transaksi HARI INI saja (Biar ringan)
-            db.from('orders')
-              .select('created_at, grand_total')
-              .gte('created_at', today) // gte = Greater Than or Equal (>=)
-              .order('created_at', { ascending: true })
-              .then(({ data, error }) => {
-                  if(error) return console.error(error);
-                  
-                  let omzet = 0;
-                  let count = data.length;
-                  let salesMap = {};
-
+            const today = new Date().toISOString().split('T')[0];
+            db.from('orders').select('created_at, grand_total').gte('created_at', today).order('created_at', {ascending:true})
+              .then(({ data }) => {
+                  if(!data) return;
+                  let omzet = 0, count = data.length, salesMap = {};
                   data.forEach(d => {
                       omzet += d.grand_total;
-                      // Grouping per Jam untuk Grafik
-                      const jam = new Date(d.created_at).getHours() + ":00";
-                      salesMap[jam] = (salesMap[jam] || 0) + d.grand_total;
+                      const h = new Date(d.created_at).getHours() + ":00";
+                      salesMap[h] = (salesMap[h]||0) + d.grand_total;
                   });
-
-                  // Update Angka
                   document.getElementById('dash-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
                   document.getElementById('dash-count').innerText = count;
-
-                  // Update Grafik
                   myChart.data.labels = Object.keys(salesMap);
                   myChart.data.datasets[0].data = Object.values(salesMap);
                   myChart.update();
               });
         }
 
-        // Subscribe Realtime biar angka dashboard gerak sendiri
-        db.channel('dashboard-updates')
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
-              loadDashboard(); // Refresh kalau ada order baru
-              loadTrxHistory(); // Refresh tabel riwayat
-          })
-          .subscribe();
-
-        // --- 2. LOAD DATA MENU ---
         function loadMenu() {
-            db.from('products').select('*').order('id', { ascending: true })
-              .then(({ data, error }) => {
-                  if(error) return;
-                  
-                  const tbody = document.getElementById('tabel-menu'); 
-                  tbody.innerHTML = "";
-                  let lowStock = 0;
-
-                  data.forEach(d => {
-                      if(d.stock < 5) lowStock++;
-                      tbody.innerHTML += `
-                        <tr>
-                            <td>${d.name}</td>
-                            <td>${d.category}</td>
-                            <td>Rp ${d.price.toLocaleString()}</td>
-                            <td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td>
-                            <td>
-                                <button style="padding:5px 10px; background:#f6ad55; border:none; border-radius:5px; cursor:pointer;" onclick="editMenu(${d.id}, '${d.name}', ${d.price}, '${d.category}', ${d.stock})">✏️</button> 
-                                <button style="padding:5px 10px; background:#ff4757; color:white; border:none; border-radius:5px; cursor:pointer;" onclick="delMenu(${d.id})">🗑️</button>
-                            </td>
-                        </tr>`;
-                  });
-                  document.getElementById('dash-stock').innerText = lowStock;
-              });
+            db.from('products').select('*').order('id', {ascending:true}).then(({ data }) => {
+                const tbody = document.getElementById('tabel-menu'); tbody.innerHTML = "";
+                let low = 0;
+                data.forEach(d => {
+                    if(d.stock < 5) low++;
+                    tbody.innerHTML += `<tr><td>${d.name}</td><td>${d.category}</td><td>Rp ${d.price.toLocaleString()}</td>
+                    <td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td>
+                    <td><button style="background:#f6ad55; padding:5px 10px;" onclick="editMenu(${d.id}, '${d.name}', ${d.price}, '${d.category}', ${d.stock})">✏️</button> 
+                    <button style="background:#ff4757; color:white; padding:5px 10px;" onclick="delMenu(${d.id})">🗑️</button></td></tr>`;
+                });
+                document.getElementById('dash-stock').innerText = low;
+            });
         }
 
-        // --- 3. LOAD RIWAYAT TRANSAKSI (Limit 20 Terakhir) ---
-        function loadTrxHistory() {
-            db.from('orders').select('*').order('created_at', { ascending: false }).limit(20)
-              .then(({ data }) => {
-                  const tbody = document.getElementById('tabel-transaksi'); 
-                  tbody.innerHTML = "";
-                  if(data) data.forEach(d => {
-                      tbody.innerHTML += `
-                        <tr>
-                            <td>${new Date(d.created_at).toLocaleTimeString()}</td>
-                            <td>${d.order_number}</td>
-                            <td>Rp ${d.grand_total.toLocaleString('id-ID')}</td>
-                            <td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:bold;">${d.status}</span></td>
-                        </tr>`;
-                  });
-              });
+        function loadTrx() {
+            db.from('orders').select('*').order('created_at', {ascending:false}).limit(20).then(({ data }) => {
+                const tbody = document.getElementById('tabel-transaksi'); tbody.innerHTML = "";
+                if(data) data.forEach(d => tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>Rp ${d.grand_total.toLocaleString()}</td><td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px;">${d.status}</span></td></tr>`);
+            });
         }
 
-        // --- UTILS & NAVIGASI ---
-        window.showSection = (id) => {
-            document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        };
-        window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
-        const cleanNum = (v) => Number(v.replace(/\./g,''));
+        function loadSettings() {
+            db.from('settings').select('*').single().then(({ data }) => {
+                if(data) {
+                    document.getElementById('store-name').value = data.store_name||"";
+                    document.getElementById('store-phone').value = data.store_phone||"";
+                    document.getElementById('store-address').value = data.store_address||"";
+                    document.getElementById('store-footer').value = data.store_footer||"";
+                    document.getElementById('tax-rate').value = data.tax_rate||0;
+                    document.getElementById('service-rate').value = data.service_rate||0;
+                }
+            });
+        }
 
-        // --- CRUD MENU (SUPABASE) ---
-        const btnSave = document.getElementById('btn-simpan-menu');
-        
-        btnSave.addEventListener('click', async () => {
-            const id = document.getElementById('menu-id').value;
-            const payload = {
-                name: document.getElementById('nama').value,
-                price: cleanNum(document.getElementById('harga').value),
-                stock: Number(document.getElementById('stok').value),
-                category: document.getElementById('kategori').value
-            };
-
-            if(!payload.name) return alert("Nama wajib diisi!");
-
-            btnSave.innerText = "Menyimpan...";
-            
-            let error;
-            if(id) {
-                // UPDATE
-                const { error: err } = await db.from('products').update(payload).eq('id', id);
-                error = err;
-            } else {
-                // INSERT
-                const { error: err } = await db.from('products').insert(payload);
-                error = err;
-            }
-
-            if(error) alert("Gagal: " + error.message);
-            else {
-                alert("Berhasil disimpan!");
-                resetForm();
-                loadMenu();
-            }
-        });
-
+        // --- CRUD MENU HANDLERS (GLOBAL) ---
         window.editMenu = (id, n, h, k, s) => {
             document.getElementById('menu-id').value = id;
             document.getElementById('nama').value = n;
             document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(h);
             document.getElementById('stok').value = s;
             document.getElementById('kategori').value = k;
-            btnSave.innerText = "UPDATE MENU"; 
+            document.getElementById('btn-simpan-menu').innerText = "UPDATE MENU";
             document.getElementById('btn-batal').style.display = "inline-block";
         };
 
         window.resetForm = () => {
             document.getElementById('menu-id').value = ""; document.getElementById('nama').value = "";
             document.getElementById('harga').value = ""; document.getElementById('stok').value = "";
-            btnSave.innerText = "SIMPAN MENU"; 
+            document.getElementById('btn-simpan-menu').innerText = "SIMPAN MENU";
             document.getElementById('btn-batal').style.display = "none";
-        }
-
-        window.delMenu = async (id) => { 
-            if(confirm("Yakin hapus menu ini?")) {
-                await db.from('products').delete().eq('id', id);
-                loadMenu();
-            }
         };
 
-        // --- SETTINGS (SUPABASE) ---
-        // Load Settings saat buka menu
-        window.showSection = (id) => {
-            document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            
-            if(id === 'settings') {
-                db.from('settings').select('*').single().then(({ data }) => {
-                    if(data) {
-                        document.getElementById('store-name').value = data.store_name || "";
-                        document.getElementById('store-phone').value = data.store_phone || "";
-                        document.getElementById('store-address').value = data.store_address || "";
-                        document.getElementById('store-footer').value = data.store_footer || "";
-                        document.getElementById('tax-rate').value = data.tax_rate || 0;
-                        document.getElementById('service-rate').value = data.service_rate || 0;
-                    }
-                });
-            }
+        window.delMenu = async (id) => {
+            if(confirm("Hapus?")) { await db.from('products').delete().eq('id', id); loadMenu(); }
         };
-        // Biar default dashboard muncul
-        document.getElementById('dashboard').classList.add('active');
 
         window.saveSettings = async () => {
-            const payload = {
+            const p = {
                 store_name: document.getElementById('store-name').value,
                 store_phone: document.getElementById('store-phone').value,
                 store_address: document.getElementById('store-address').value,
@@ -360,16 +232,34 @@
                 tax_rate: Number(document.getElementById('tax-rate').value),
                 service_rate: Number(document.getElementById('service-rate').value)
             };
+            await db.from('settings').update(p).eq('id', 1);
+            alert("Tersimpan!");
+        };
+
+        // Event Listener Tombol Simpan Menu
+        document.getElementById('btn-simpan-menu').addEventListener('click', async () => {
+            const id = document.getElementById('menu-id').value;
+            const p = {
+                name: document.getElementById('nama').value,
+                price: cleanNum(document.getElementById('harga').value),
+                stock: Number(document.getElementById('stok').value),
+                category: document.getElementById('kategori').value
+            };
+            if(!p.name) return alert("Isi nama!");
             
-            // Kita asumsikan settings cuma ada 1 row (id=1)
-            await db.from('settings').update(payload).eq('id', 1);
-            alert("Pengaturan disimpan!");
-        }
+            if(id) await db.from('products').update(p).eq('id', id);
+            else await db.from('products').insert(p);
+            
+            alert("Sukses!"); window.resetForm(); loadMenu();
+        });
 
         // --- INIT ---
-        loadDashboard();
-        loadMenu();
-        loadTrxHistory();
+        loadDashboard(); loadMenu(); loadTrx();
+        
+        // Realtime Subscribe
+        db.channel('admin-updates').on('postgres_changes', { event: '*', schema: 'public' }, () => {
+            loadDashboard(); loadMenu(); loadTrx();
+        }).subscribe();
 
     </script>
 </body>

@@ -1,4 +1,4 @@
-import { db } from './firebase-config.js'; 
+import { db } from './db-config.js'; 
 
 // --- ELEMEN HTML UTAMA ---
 const daftarMenuEl = document.getElementById('daftar-menu');
@@ -36,133 +36,78 @@ let currentTransaction = {};
 let currentMethod = 'cash'; 
 let activeCategory = 'all';
 
-// --- 0. LOAD CONFIG (SUPABASE) ---
+// --- 0. LOAD CONFIG ---
 async function loadConfig() {
     try {
-        const { data, error } = await db.from('settings').select('*').single();
+        const { data } = await db.from('settings').select('*').single();
         if (data) storeConfig = data;
-    } catch (e) { console.error("Gagal load config:", e); }
+    } catch (e) { console.error(e); }
 }
 loadConfig();
 
-// --- 1. MENU LOGIC (SUPABASE) ---
+// --- 1. MENU LOGIC ---
 async function fetchMenu() {
-    // Ambil data menu dari tabel 'products'
-    const { data, error } = await db
-        .from('products')
-        .select('*')
-        .order('id', { ascending: true }); // Urutkan biar rapi
+    const { data, error } = await db.from('products').select('*').order('id', { ascending: true });
+    if (error) return;
 
-    if (error) {
-        console.error("Gagal ambil menu:", error);
-        return;
-    }
-
-    // Masukkan data ke variabel global
     allProductsList = data; 
     productsCache = {};
-    
-    // Simpan ke cache untuk keperluan Cart nanti
-    data.forEach(item => {
-        productsCache[item.id] = item;
-    });
-
+    data.forEach(item => productsCache[item.id] = item);
     renderMenu(activeCategory);
 }
 
-// Fitur Realtime Supabase (Kalau stok berubah, menu refresh otomatis)
-db.channel('public:products')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
-        console.log('Update Menu Realtime:', payload);
-        fetchMenu(); 
-    })
-    .subscribe();
-
-// Panggil fungsi pertama kali
+// REALTIME UPDATE
+db.channel('public:products').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchMenu()).subscribe();
 fetchMenu();
 
-
+// --- EXPOSE GLOBAL FUNCTIONS ---
 window.filterMenu = (kategori, btnElement) => {
     activeCategory = kategori;
     document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active'));
-    if(btnElement) {
-        btnElement.classList.add('active');
-    } else {
-        // Cari tombol yang sesuai teksnya (agak tricky tapi works)
-        const targetBtn = Array.from(document.querySelectorAll('.cat-btn')).find(b => b.innerText.toLowerCase().includes(kategori === 'all' ? 'semua' : kategori.toLowerCase()));
-        if(targetBtn) targetBtn.classList.add('active');
-    }
+    if(btnElement) btnElement.classList.add('active');
     renderMenu(kategori);
 }
 
 function renderMenu(kategori) {
     if(!daftarMenuEl) return;
     daftarMenuEl.innerHTML = "";
-    
     const filtered = kategori === 'all' ? allProductsList : allProductsList.filter(p => p.category === kategori);
 
-    if(filtered.length === 0) {
-        daftarMenuEl.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#888;">Menu kosong.</p>`;
-        return;
-    }
+    if(filtered.length === 0) return daftarMenuEl.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#888;">Menu kosong.</p>`;
 
     filtered.forEach(data => {
         const stock = data.stock !== undefined ? data.stock : 0;
         const isHabis = stock <= 0;
         const card = document.createElement('div');
         card.className = 'card';
+        if(isHabis) { card.style.opacity = "0.5"; card.style.background = "rgba(0,0,0,0.5)"; }
         
-        // Visual Update kalau habis
-        if(isHabis) {
-            card.style.opacity = "0.5";
-            card.style.background = "rgba(0,0,0,0.5)";
-        }
+        const statusText = isHabis ? "<span style='color:#ff4757; font-size:12px; font-weight:bold;'>HABIS</span>" : `<span style='color:#a0aec0; font-size:12px;'>Stok: ${stock}</span>`;
+        card.innerHTML = `<h3>${data.name}</h3>${statusText}<div class="price">Rp ${data.price.toLocaleString('id-ID')}</div>`;
         
-        const statusText = isHabis 
-            ? "<span style='color:#ff4757; font-size:12px; font-weight:bold;'>HABIS</span>" 
-            : `<span style='color:#a0aec0; font-size:12px;'>Stok: ${stock}</span>`;
-
-        card.innerHTML = `
-            <h3>${data.name}</h3>
-            ${statusText}
-            <div class="price">Rp ${data.price.toLocaleString('id-ID')}</div>
-        `;
-        // Jangan lupa: Kirim ID produk saat diklik
-        if (!isHabis) card.addEventListener('click', () => addToCart(data.id));
+        if (!isHabis) card.addEventListener('click', () => window.addToCart(data.id));
         daftarMenuEl.appendChild(card);
     });
 }
 
-// --- 2. CART LOGIC (SAMA SEPERTI SEBELUMNYA) ---
 window.addToCart = (id) => {
-    // Pastikan ID tipe data sama (Supabase ID = number)
     const item = cart.find(i => i.id === id);
     const product = productsCache[id];
-    
     if (!product) return;
-
     if ((item ? item.qty : 0) + 1 > product.stock) return alert("Stok habis!");
     
-    if (item) {
-        item.qty++;
-    } else {
-        cart.push({ id, name: product.name, price: product.price, qty: 1 });
-    }
+    if (item) item.qty++; else cart.push({ id, name: product.name, price: product.price, qty: 1 });
     updateCartUI();
 }
 
 window.changeQty = (id, delta) => {
-    // Convert ID string ke number kalau perlu (karena HTML attribute selalu string)
     const numId = Number(id);
     const idx = cart.findIndex(i => i.id === numId);
-    
     if (idx === -1) return;
     
     const newQty = cart[idx].qty + delta;
-    const maxStock = productsCache[numId].stock;
-
     if (newQty <= 0) cart.splice(idx, 1);
-    else if (delta > 0 && newQty > maxStock) return alert("Stok mentok!");
+    else if (delta > 0 && newQty > productsCache[numId].stock) return alert("Stok mentok!");
     else cart[idx].qty = newQty;
     
     updateCartUI();
@@ -173,10 +118,10 @@ window.clearCart = () => { if(confirm("Hapus semua?")) { cart = []; updateCartUI
 function updateCartUI() {
     cartItemsEl.innerHTML = "";
     if (cart.length === 0) {
-        cartItemsEl.innerHTML = `<div style="text-align:center; color:rgba(255,255,255,0.3); margin-top:50px;">Belum ada pesanan</div>`;
-        btnCheckout.disabled = true; totalPriceEl.innerHTML = `<div style="text-align:center; color:rgba(255,255,255,0.3);">Siap Cuan?</div>`; btnTotalLabel.innerText = "Rp 0";
-        return;
+        btnCheckout.disabled = true; totalPriceEl.innerHTML = `<div style="text-align:center; color:#555;">Siap Cuan?</div>`; btnTotalLabel.innerText = "Rp 0";
+        return cartItemsEl.innerHTML = `<div style="text-align:center; color:#555; margin-top:50px;">Belum ada pesanan</div>`;
     }
+    
     let subtotal = 0;
     cart.forEach(item => {
         subtotal += item.price * item.qty;
@@ -188,7 +133,6 @@ function updateCartUI() {
             </div>`;
     });
     
-    // Pakai nama field yang sesuai tabel settings SQL (snake_case)
     const tax = subtotal * ((storeConfig.tax_rate || 0) / 100);
     const service = subtotal * ((storeConfig.service_rate || 0) / 100);
     const grand = subtotal + tax + service;
@@ -202,18 +146,15 @@ function updateCartUI() {
     btnCheckout.disabled = false;
 }
 
-// --- 3. PEMBAYARAN & KEMBALIAN ---
+// --- PAYMENT ---
 const cleanNum = (val) => Number(String(val).replace(/\./g, "").replace(/,/g, ""));
 const formatNum = (num) => new Intl.NumberFormat('id-ID').format(num);
 
 window.toggleTableInput = () => {
     const type = document.getElementById('order-type').value;
     const tableInput = document.getElementById('table-num');
-    if (type === 'takeaway') {
-        tableInput.value = ''; tableInput.disabled = true; tableInput.placeholder = "X"; tableInput.style.opacity = "0.5";
-    } else {
-        tableInput.disabled = false; tableInput.placeholder = "No. Meja"; tableInput.style.opacity = "1"; tableInput.focus();
-    }
+    if (type === 'takeaway') { tableInput.value = ''; tableInput.disabled = true; tableInput.placeholder = "X"; } 
+    else { tableInput.disabled = false; tableInput.placeholder = "No. Meja"; }
 }
 
 btnCheckout.addEventListener('click', () => {
@@ -221,202 +162,93 @@ btnCheckout.addEventListener('click', () => {
     const tableNum = document.getElementById('table-num').value.trim();
     const orderType = document.getElementById('order-type').value;
 
-    if (!custName) return alert("⚠️ Isi nama pelanggan!");
-    if (orderType === 'dine-in' && !tableNum) return alert("⚠️ Nomor meja wajib diisi!");
+    if (!custName) return alert("Isi nama pelanggan!");
+    if (orderType === 'dine-in' && !tableNum) return alert("Nomor meja wajib diisi!");
 
     const subtotal = cart.reduce((s, i) => s + (i.price * i.qty), 0);
     const tax = subtotal * ((storeConfig.tax_rate||0) / 100);
     const service = subtotal * ((storeConfig.service_rate||0) / 100);
     const grand = Math.ceil(subtotal + tax + service); 
 
-    currentTransaction = {
-        customer_name: custName,
-        table_number: orderType === 'takeaway' ? '' : tableNum, // Kosongkan string kalau takeaway
-        order_type: orderType,
-        subtotal, tax, service, grand_total: grand,
-        items: cart
-    };
+    currentTransaction = { customer_name: custName, table_number: orderType === 'takeaway' ? '' : tableNum, order_type: orderType, subtotal, tax, service, grand_total: grand, items: cart };
 
     payTotalDisplay.innerText = "Rp " + formatNum(grand);
-    payInput.value = "";
-    payChange.innerText = "Rp 0";
-    document.getElementById('edc-ref').value = ""; 
-    setPaymentMethod('cash'); 
-    modalPayment.style.display = "flex"; 
+    payInput.value = ""; payChange.innerText = "Rp 0";
+    window.setPaymentMethod('cash'); modalPayment.style.display = "flex"; 
 });
 
 window.setPaymentMethod = (method) => {
     currentMethod = method;
-    [btnCash, btnQris, btnEdc].forEach(btn => {
-        btn.style.borderColor = 'rgba(255,255,255,0.2)'; btn.style.color = '#ccc'; btn.style.background = 'var(--bg-main)';
-    });
-    
+    [btnCash, btnQris, btnEdc].forEach(btn => { btn.style.borderColor = 'rgba(255,255,255,0.2)'; btn.style.color = '#ccc'; btn.style.background = 'var(--bg-main)'; });
     const activeBtn = method === 'cash' ? btnCash : (method === 'qris' ? btnQris : btnEdc);
-    activeBtn.style.borderColor = 'var(--accent-green)';
-    activeBtn.style.color = 'var(--accent-green)';
-    activeBtn.style.background = 'rgba(0,255,136,0.1)';
-
-    areaCash.style.display = 'none';
-    areaQris.style.display = 'none';
-    areaEdc.style.display = 'none';
-
-    if (method === 'cash') {
-        areaCash.style.display = 'block';
-        setTimeout(() => payInput.focus(), 100);
-    } else if (method === 'qris') {
-        areaQris.style.display = 'block';
-    } else {
-        areaEdc.style.display = 'block';
-    }
+    activeBtn.style.borderColor = 'var(--accent-green)'; activeBtn.style.color = 'var(--accent-green)'; activeBtn.style.background = 'rgba(0,255,136,0.1)';
+    areaCash.style.display = method === 'cash' ? 'block' : 'none';
+    areaQris.style.display = method === 'qris' ? 'block' : 'none';
+    areaEdc.style.display = method === 'edc' ? 'block' : 'none';
 };
 
 window.calcChange = (input) => {
-    if(input) { 
-        let val = input.value.replace(/\D/g, "");
-        input.value = formatNum(val);
-    }
+    if(input) input.value = formatNum(input.value.replace(/\D/g, ""));
     const received = cleanNum(payInput.value);
-    const total = currentTransaction.grand_total;
-    const change = received - total;
-
-    if (received >= total) {
-        payChange.innerText = "Rp " + formatNum(change);
-        payChange.style.color = "var(--accent-green)"; 
-    } else {
-        payChange.innerText = "Kurang: Rp " + formatNum(Math.abs(change));
-        payChange.style.color = "var(--danger)"; 
-    }
+    const change = received - currentTransaction.grand_total;
+    payChange.innerText = received >= currentTransaction.grand_total ? "Rp " + formatNum(change) : "Kurang: Rp " + formatNum(Math.abs(change));
 };
 
-window.fastCash = (amount) => {
-    if (amount === 'pas') {
-        payInput.value = formatNum(currentTransaction.grand_total);
-    } else {
-        payInput.value = formatNum(amount);
-    }
-    calcChange();
-};
+window.fastCash = (amt) => { payInput.value = formatNum(amt === 'pas' ? currentTransaction.grand_total : amt); window.calcChange(); };
+window.closePayment = () => modalPayment.style.display = "none";
 
-window.closePayment = () => {
-    modalPayment.style.display = "none";
-};
-
-// --- 4. FINALISASI TRANSAKSI (SUPABASE) ---
 window.processFinalPayment = async () => {
     const received = cleanNum(payInput.value);
-    const total = currentTransaction.grand_total;
-    const edcRef = document.getElementById('edc-ref').value;
-
-    if (currentMethod === 'cash') {
-        if (received < total) return alert("⚠️ Uang diterima kurang!");
-    } 
-
-    if (!confirm("Konfirmasi pembayaran?")) return;
+    if (currentMethod === 'cash' && received < currentTransaction.grand_total) return alert("Uang kurang!");
+    if (!confirm("Proses bayar?")) return;
 
     try {
-        const nomorInv = "INV-" + Date.now();
-        
-        // 1. Simpan Header Transaksi (Tabel 'orders')
-        const { data: orderData, error: orderError } = await db.from('orders').insert({
-            order_number: nomorInv,
+        const { data: orderData, error } = await db.from('orders').insert({
+            order_number: "INV-" + Date.now(),
             customer_name: currentTransaction.customer_name,
             table_number: currentTransaction.table_number,
             order_type: currentTransaction.order_type,
-            
             subtotal: currentTransaction.subtotal,
             tax: currentTransaction.tax,
             service: currentTransaction.service,
             grand_total: currentTransaction.grand_total,
-            
             payment_method: currentMethod,
-            amount_received: (currentMethod === 'cash' ? received : total),
-            change_amount: (currentMethod === 'cash' ? (received - total) : 0),
-            
+            amount_received: (currentMethod === 'cash' ? received : currentTransaction.grand_total),
+            change_amount: (currentMethod === 'cash' ? (received - currentTransaction.grand_total) : 0),
             status: 'paid'
-        }).select().single(); // .select().single() penting biar kita dapat ID transaksi barunya
+        }).select().single();
 
-        if (orderError) throw new Error("Gagal simpan order: " + orderError.message);
-        
-        const newOrderId = orderData.id; // Ini ID transaksi di database (contoh: 1, 2, 3...)
+        if (error) throw error;
 
-        // 2. Simpan Detail Item & Potong Stok
-        // Kita loop satu per satu item di keranjang
         for (const item of currentTransaction.items) {
-            
-            // Masukkan ke tabel 'order_items'
-            await db.from('order_items').insert({
-                order_id: newOrderId,
-                product_id: item.id,
-                product_name: item.name,
-                price_at_purchase: item.price,
-                qty: item.qty,
-                subtotal: item.price * item.qty
-            });
-
-            // Update Stok di tabel 'products'
-            const currentStock = productsCache[item.id].stock;
-            await db.from('products')
-                .update({ stock: currentStock - item.qty })
-                .eq('id', item.id);
+            await db.from('order_items').insert({ order_id: orderData.id, product_id: item.id, product_name: item.name, price_at_purchase: item.price, qty: item.qty, subtotal: item.price * item.qty });
+            const currStock = productsCache[item.id].stock;
+            await db.from('products').update({ stock: currStock - item.qty }).eq('id', item.id);
         }
 
-        // 3. Reset UI & Tampilkan Struk
         modalPayment.style.display = "none"; 
-        
-        // Tambahkan data ID & Tanggal biar struk lengkap
-        const strukData = {
-            ...currentTransaction,
-            order_number: nomorInv,
-            amount_received: (currentMethod === 'cash' ? received : total),
-            change_amount: (currentMethod === 'cash' ? (received - total) : 0),
-            payment_ref: (currentMethod === 'edc' ? edcRef : '-'),
-            payment_method: currentMethod
-        };
-        
-        renderStruk(strukData);
+        renderStruk({...currentTransaction, ...orderData});
         modalStruk.style.display = "flex"; 
-        
-        // Bersihkan Form
-        document.getElementById('cust-name').value = "";
-        document.getElementById('table-num').value = "";
-        
-    } catch (e) {
-        alert("Error Transaksi: " + e.message);
-        console.error(e);
-    }
+        document.getElementById('cust-name').value = ""; document.getElementById('table-num').value = "";
+    } catch (e) { alert("Error: " + e.message); }
 };
 
 function renderStruk(data) {
-    document.querySelector('.struk-header h2').innerText = storeConfig.store_name || "CUAN-IN";
-    document.querySelector('.struk-header p').innerText = storeConfig.store_address || "";
-    document.querySelector('.struk-footer p:first-child').innerText = storeConfig.store_footer || "Terima Kasih!";
+    document.querySelector('.struk-header h2').innerText = storeConfig.store_name;
+    document.querySelector('.struk-header p').innerText = storeConfig.store_address;
+    document.querySelector('.struk-footer p:first-child').innerText = storeConfig.store_footer;
 
     const labelMeja = data.order_type === 'takeaway' ? "TAKEAWAY" : `Meja: ${data.table_number}`;
+    strukContent.innerHTML = `<div style="border-bottom:1px dashed #000; padding-bottom:5px; margin-bottom:5px; font-size:12px;">${labelMeja} / <strong>${data.customer_name}</strong></div>`;
     
-    strukContent.innerHTML = `
-        <div style="border-bottom:1px dashed #000; padding-bottom:5px; margin-bottom:5px; font-size:12px;">
-            ${labelMeja} / <strong>${data.customer_name}</strong>
-        </div>`;
+    data.items.forEach(i => strukContent.innerHTML += `<div class="struk-item"><span>${i.name} (${i.qty})</span><span>${(i.price*i.qty).toLocaleString('id-ID')}</span></div>`);
     
-    data.items.forEach(i => {
-        strukContent.innerHTML += `<div class="struk-item"><span>${i.name} (${i.qty})</span><span>${(i.price*i.qty).toLocaleString('id-ID')}</span></div>`;
-    });
-    
-    let methodLabel = 'TUNAI';
-    if(data.payment_method === 'qris') methodLabel = 'QRIS';
-    if(data.payment_method === 'edc') methodLabel = 'EDC/BANK';
-
     strukContent.innerHTML += `
         <hr style="border-top:1px dashed #000; margin:5px 0;">
-        <div class="struk-item"><span>Subtotal</span><span>${data.subtotal.toLocaleString('id-ID')}</span></div>
-        ${data.tax>0 ? `<div class="struk-item"><span>Tax</span><span>${data.tax.toLocaleString('id-ID')}</span></div>`:''}
-        ${data.service>0 ? `<div class="struk-item"><span>Srvc</span><span>${data.service.toLocaleString('id-ID')}</span></div>`:''}
-        <div class="struk-item" style="font-weight:bold; margin-top:5px;"><span>TOTAL</span><span>${data.grand_total.toLocaleString('id-ID')}</span></div>
-        <div class="struk-item"><span>Bayar (${methodLabel})</span><span>${data.amount_received.toLocaleString('id-ID')}</span></div>
+        <div class="struk-item"><span>Total</span><span>${data.grand_total.toLocaleString('id-ID')}</span></div>
+        <div class="struk-item"><span>Bayar</span><span>${data.amount_received.toLocaleString('id-ID')}</span></div>
         <div class="struk-item"><span>Kembali</span><span>${data.change_amount.toLocaleString('id-ID')}</span></div>
-        ${data.payment_ref !== '-' ? `<div class="struk-item" style="font-size:10px;">Ref: ${data.payment_ref}</div>` : ''}
     `;
-    
     strukTotal.innerText = "Rp " + data.grand_total.toLocaleString('id-ID'); 
     strukDate.innerText = new Date().toLocaleString('id-ID');
     strukId.innerText = data.order_number;

@@ -8,74 +8,41 @@
     <style>
         body { font-family: 'Poppins', sans-serif; background: #1a1a2e; color: white; padding: 20px; }
         h1 { text-align: center; color: #00ff88; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; border-bottom: 2px solid #16213e; padding-bottom: 20px; }
-        
         #kitchen-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        
         .ticket { background: #16213e; border-radius: 15px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); animation: popIn 0.3s; display: flex; flex-direction: column; }
         @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        
         .ticket-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .table-badge { background: #00ff88; color: black; padding: 5px 10px; border-radius: 20px; font-weight: 800; font-size: 14px; }
         .takeaway-badge { background: #f6ad55; color: black; padding: 5px 10px; border-radius: 20px; font-weight: 800; font-size: 14px; }
-        
         .item-list { list-style: none; padding: 0; margin: 0; flex: 1; }
         .item-list li { margin-bottom: 8px; font-size: 15px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 8px; }
-        
         .btn-done { margin-top: 15px; width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; transition: 0.2s; }
         .btn-done:hover { background: #ff6b81; transform: scale(1.02); }
     </style>
 </head>
 <body>
     <h1>👨‍🍳 Kitchen Monitor (SQL)</h1>
-    <div id="kitchen-container">
-        <div style="text-align:center; color:#555; grid-column:1/-1;">Menunggu pesanan...</div>
-    </div>
+    <div id="kitchen-container"><div style="text-align:center; color:#555;">Menunggu pesanan...</div></div>
 
     <script type="module">
         import { db } from './firebase-config.js'; 
 
-        // Fungsi Load Pesanan Aktif
         async function loadOrders() {
-            // Ambil order yang statusnya 'paid' (Sudah bayar tapi belum dimasak)
-            // Kita butuh join tabel order_items biar tahu masak apa.
-            // Di Supabase JS, cara join agak unik. Kita ambil Order dulu, lalu isi Items-nya manual/relasi.
-            
-            // 1. Ambil Data Order Utama
-            const { data: orders, error } = await db
-                .from('orders')
-                .select(`*, order_items(*)`) // Syntax magic untuk ambil detail item sekaligus!
-                .eq('status', 'paid')
-                .order('created_at', { ascending: true });
-
+            const { data: orders, error } = await db.from('orders').select(`*, order_items(*)`).eq('status', 'paid').order('created_at', { ascending: true });
             if(error) return console.error(error);
-
+            
             const container = document.getElementById('kitchen-container');
             container.innerHTML = "";
-            
-            if (orders.length === 0) {
-                container.innerHTML = '<div style="text-align:center; color:#555; grid-column:1/-1;">Dapur Bersih! Tidak ada pesanan.</div>';
-                return;
-            }
+            if (orders.length === 0) return container.innerHTML = '<div style="text-align:center; color:#555; grid-column:1/-1;">Dapur Bersih!</div>';
 
             orders.forEach(data => {
-                // Render List Item dari data relasi 'order_items'
-                const itemsHtml = data.order_items.map(i => 
-                    `<li><strong>${i.qty}x</strong> ${i.product_name}</li>`
-                ).join("");
-
-                const badge = (data.order_type === 'takeaway' || !data.table_number) 
-                    ? `<span class="takeaway-badge">TAKEAWAY</span>` 
-                    : `<span class="table-badge">MEJA ${data.table_number}</span>`;
+                const itemsHtml = data.order_items.map(i => `<li><strong>${i.qty}x</strong> ${i.product_name}</li>`).join("");
+                const badge = (data.order_type === 'takeaway' || !data.table_number) ? `<span class="takeaway-badge">TAKEAWAY</span>` : `<span class="table-badge">MEJA ${data.table_number}</span>`;
                 
-                const time = new Date(data.created_at).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-
                 const card = document.createElement('div');
                 card.className = 'ticket';
                 card.innerHTML = `
-                    <div class="ticket-header">
-                        ${badge}
-                        <span style="font-size:12px; color:#aaa;">${time}</span>
-                    </div>
+                    <div class="ticket-header">${badge}<span style="font-size:12px; color:#aaa;">${new Date(data.created_at).toLocaleTimeString('id-ID')}</span></div>
                     <div style="margin-bottom:10px; color:#ccc;">👤 ${data.customer_name}</div>
                     <ul class="item-list">${itemsHtml}</ul>
                     <button class="btn-done" onclick="selesaiMasak(${data.id})">✅ SELESAI</button>
@@ -84,23 +51,12 @@
             });
         }
 
-        // Fungsi Update Status jadi 'served'
+        // EXPOSE TO WINDOW
         window.selesaiMasak = async (id) => {
-            if(!confirm("Pesanan sudah diantar?")) return;
-            
-            await db.from('orders').update({ status: 'served' }).eq('id', id);
-            // Tidak perlu panggil loadOrders() karena Realtime akan otomatis menjalankannya
-        }
+            if(confirm("Pesanan sudah diantar?")) await db.from('orders').update({ status: 'served' }).eq('id', id);
+        };
 
-        // Realtime Listener (Otomatis refresh kalau ada pesanan baru/selesai)
-        db.channel('kitchen-room')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-                console.log("Ada update pesanan!");
-                loadOrders();
-            })
-            .subscribe();
-
-        // Jalan pertama kali
+        db.channel('kitchen').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => loadOrders()).subscribe();
         loadOrders();
     </script>
 </body>

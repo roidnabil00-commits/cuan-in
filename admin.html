@@ -115,26 +115,30 @@
     </div>
 
     <script type="module">
-        import { db } from './firebase-config.js'; 
+        import { db, auth } from './db-config.js'; 
 
-        // --- AUTH CHECK ---
-        if (localStorage.getItem('user_role') !== 'owner') window.location.href = "login.html";
-
-        // --- GLOBAL FUNCTIONS (WAJIB ADA BIAR TOMBOL HTML BISA KLIK) ---
-        window.logout = () => { localStorage.removeItem('user_role'); window.location.href = "login.html"; };
-        
-        window.showSection = (id, btn) => {
-            document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
+        // --- 1. CEK KEAMANAN (SATPAM) ---
+        // Fungsi ini jalan otomatis saat halaman dibuka
+        async function checkSession() {
+            const { data: { session } } = await auth.getSession();
             
-            // Highlight sidebar
-            if(btn) {
-                document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
-                btn.classList.add('active');
+            // Kalau tidak ada sesi login (belum login), tendang ke login.html
+            if (!session) {
+                window.location.href = "login.html";
             }
+        }
+        checkSession();
 
-            if(id === 'settings') loadSettings(); 
+        // --- 2. FUNGSI LOGOUT (Global) ---
+        window.logout = async () => { 
+            if(confirm("Yakin ingin keluar?")) {
+                await auth.signOut(); // Hapus sesi di server & browser
+                localStorage.removeItem('user_role');
+                window.location.href = "login.html"; 
+            }
         };
+
+        // ... (LANJUTKAN DENGAN KODE SISA NYA SEPERTI window.showSection, DLL) ...
 
         window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
         const cleanNum = (v) => Number(v.replace(/\./g,''));

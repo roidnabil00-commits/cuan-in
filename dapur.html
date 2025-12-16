@@ -25,7 +25,7 @@
     <div id="kitchen-container"><div style="text-align:center; color:#555;">Menunggu pesanan...</div></div>
 
     <script type="module">
-        import { db } from './firebase-config.js'; 
+        import { db } from './db-config.js';
 
         async function loadOrders() {
             const { data: orders, error } = await db.from('orders').select(`*, order_items(*)`).eq('status', 'paid').order('created_at', { ascending: true });

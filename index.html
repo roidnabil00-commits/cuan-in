@@ -233,15 +233,64 @@
         </div>
     </div>
 
-    <script type="module" src="app.js"></script>
-    
-    <script>
-        // Cek apakah user sudah "Login" (Pura-pura login pakai localStorage)
-        const isOwner = localStorage.getItem('user_role') === 'owner';
-        
+    <script type="module">
+        // Import auth dari settingan database kita
+        import { auth } from './db-config.js'; 
+
+        const loginForm = document.getElementById('login-form');
+        const errorMsg = document.getElementById('error-msg');
+        const btnLogin = document.getElementById('btn-login');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // UI Loading
+            btnLogin.innerText = "Memproses...";
+            btnLogin.disabled = true;
+            errorMsg.style.display = "none";
+
+            try {
+                // 1. Cek ke Supabase: Apakah email & password benar?
+                const { data, error } = await auth.signInWithPassword({
+                    email: email,
+                    password: password,
+                });
+
+                if (error) throw error;
+
+                // 2. Jika Benar: Simpan role owner (opsional) & Pindah halaman
+                // Supabase otomatis menyimpan sesi login di browser (Cookies/Storage)
+                localStorage.setItem('user_role', 'owner'); 
+                window.location.href = "admin.html";
+
+            } catch (error) {
+                // 3. Jika Salah
+                console.error("Login Gagal:", error.message);
+                errorMsg.style.display = "block";
+                errorMsg.innerText = "❌ Email atau Password Salah!";
+                btnLogin.innerText = "MASUK";
+                btnLogin.disabled = false;
+            }
+        });
+    </script>
+    <script type="module">
+        import { auth } from './db-config.js';
+
+        // Cek Login Supabase
+        async function checkAuth() {
+            const { data: { session } } = await auth.getSession();
+            if (!session) {
+                window.location.href = "login.html";
+            }
+        }
+        checkAuth();
+
         // Fungsi Logout
-        window.logout = () => { 
-            if(confirm("Keluar dari kasir?")) {
+        window.logout = async () => { 
+            if(confirm("Tutup kasir & logout?")) {
+                await auth.signOut();
                 localStorage.removeItem('user_role');
                 window.location.href = "login.html"; 
             }

@@ -8,7 +8,6 @@
         body { font-family: monospace; background-color: #333; color: white; padding: 20px; }
         h1 { text-align: center; border-bottom: 2px solid #555; padding-bottom: 10px; }
         
-        /* Grid Layout untuk Tiket Pesanan */
         #kitchen-container { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
@@ -16,22 +15,22 @@
             margin-top: 20px;
         }
 
-        /* Desain Tiket */
         .ticket { 
             background: #fff; 
             color: #000; 
             padding: 15px; 
             border-radius: 5px; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border-top: 5px solid #ffc107; /* Kuning = Baru Masuk */
+            border-top: 5px solid #ffc107; 
             animation: popIn 0.3s ease-out;
+            display: flex; flex-direction: column;
         }
         
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        .ticket-header { font-weight: bold; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .item-list { list-style: none; padding: 0; margin: 0; font-size: 14px; }
-        .item-list li { margin-bottom: 5px; }
+        .ticket-header { font-weight: bold; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .item-list { list-style: none; padding: 0; margin: 0; font-size: 14px; flex-grow: 1; }
+        .item-list li { margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         
         .btn-done { 
             width: 100%; 
@@ -40,8 +39,9 @@
             color: white; 
             border: none; 
             cursor: pointer; 
-            margin-top: 10px; 
+            margin-top: 15px; 
             font-weight: bold;
+            border-radius: 4px;
         }
         .btn-done:hover { background: #218838; }
     </style>
@@ -60,15 +60,13 @@
 
         const container = document.getElementById('kitchen-container');
 
-        // 1. FILTER: Hanya ambil pesanan yang statusnya 'paid' (Sudah dibayar tapi belum dimasak)
-        // Kita abaikan yang statusnya sudah 'served' (selesai)
+        // Filter pesanan yang statusnya 'paid' (masuk dapur)
         const q = query(
             collection(db, "orders"), 
             where("status", "==", "paid"), 
-            orderBy("created_at", "asc") // Yang duluan pesan, muncul paling kiri
+            orderBy("created_at", "asc")
         );
 
-        // 2. REAL-TIME LISTENER
         onSnapshot(q, (snapshot) => {
             container.innerHTML = ""; // Reset tampilan
             
@@ -81,45 +79,45 @@
                 const order = docSnapshot.data();
                 const orderId = docSnapshot.id;
 
-                // Render Tiket
                 const ticket = document.createElement('div');
                 ticket.className = 'ticket';
                 
-                // Format Jam
                 const time = order.created_at ? new Date(order.created_at.seconds * 1000).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-';
 
-                // Render List Menu
                 let menuHtml = '';
                 order.items.forEach(item => {
-                    menuHtml += `<li><strong>${item.qty}x</strong> ${item.name}</li>`;
+                    menuHtml += `<li><strong>${item.qty}x</strong> ${item.name} <br><small style="color:#666;">${item.variant || ''}</small></li>`;
                 });
 
+                // Warna Header Meja (Hijau kalau ada meja, Abu kalau tidak)
+                const headerColor = order.table_number ? '#28a745' : '#6c757d';
+
                 ticket.innerHTML = `
-                    <div class="ticket-header" style="background:${order.table_number ? '#28a745' : '#ccc'}; color:white; padding:5px; margin:-15px -15px 10px -15px; border-radius:5px 5px 0 0; display:flex; justify-content:space-between;">
-                        <span style="font-size:16px;">Meja ${order.table_number || '-'}</span>
-                        <span style="font-size:12px;">${time}</span>
+                    <div style="background:${headerColor}; color:white; padding:10px; margin:-15px -15px 10px -15px; border-radius:5px 5px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:18px; font-weight:bold;">Meja ${order.table_number || 'Takeaway'}</span>
+                        <span style="font-size:12px; background:rgba(0,0,0,0.2); padding:2px 5px; border-radius:4px;">${time}</span>
                     </div>
-                    <div style="font-weight:bold; margin-bottom:5px; border-bottom:1px dashed #ddd; padding-bottom:5px;">
-                        ${order.customer_name || 'Tanpa Nama'}
-                        <span style="float:right; color:#888; font-size:10px;">#${order.order_number.slice(-4)}</span>
+                    <div style="font-weight:bold; margin-bottom:10px; padding-bottom:5px; border-bottom:2px solid #eee;">
+                        👤 ${order.customer_name || 'Pelanggan'}
+                        <span style="float:right; color:#888; font-size:12px;">#${order.order_number.slice(-4)}</span>
                     </div>
                     <ul class="item-list">
                         ${menuHtml}
                     </ul>
                     <button class="btn-done" id="btn-${orderId}">✅ SELESAI MASAK</button>
                 `;
+
+                // --- INI YANG KEMARIN HILANG (Tempel tiket ke layar) ---
+                container.appendChild(ticket); 
+
+                document.getElementById(`btn-${orderId}`).addEventListener('click', () => selesaikanPesanan(orderId));
             });
         });
 
-        // 3. FUNGSI UPDATE STATUS (Dari 'paid' jadi 'served')
         async function selesaikanPesanan(id) {
             if(!confirm("Pesanan sudah siap dihidangkan?")) return;
-            
             const orderRef = doc(db, "orders", id);
-            await updateDoc(orderRef, {
-                status: "served"
-            });
-            // Nanti tiket akan hilang otomatis dari layar karena tidak memenuhi filter 'where status == paid'
+            await updateDoc(orderRef, { status: "served" });
         }
     </script>
 

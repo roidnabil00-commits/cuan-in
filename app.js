@@ -44,15 +44,14 @@ async function loadConfig() {
 }
 loadConfig();
 
-// --- 1. MENU LOGIC (DENGAN ERROR CHECKING) ---
+// --- 1. MENU LOGIC ---
 async function fetchMenu() {
     console.log("Sedang mengambil menu..."); 
-
     const { data, error } = await db.from('products').select('*').order('id', { ascending: true });
 
     if (error) {
         console.error("❌ ERROR MENU:", error);
-        alert("Gagal ambil menu: " + error.message + "\n\nSolusi: Cek SQL RLS di Supabase!");
+        alert("Gagal ambil menu: " + error.message);
         return;
     }
 
@@ -230,21 +229,69 @@ window.processFinalPayment = async () => {
             await db.from('products').update({ stock: currStock - item.qty }).eq('id', item.id);
         }
 
-        modalPayment.style.display = "none"; renderStruk({...currentTransaction, ...orderData}); modalStruk.style.display = "flex"; 
-        document.getElementById('cust-name').value = ""; document.getElementById('table-num').value = "";
+        modalPayment.style.display = "none"; 
+        renderStruk({...currentTransaction, ...orderData}); // Pass data lengkap ke struk
+        modalStruk.style.display = "flex"; 
+        
+        document.getElementById('cust-name').value = ""; 
+        document.getElementById('table-num').value = "";
     } catch (e) { alert("Error: " + e.message); }
 };
 
-// --- BAGIAN INI SUDAH DIPERBAIKI (TIDAK TERPOTONG LAGI) ---
+// --- RENDER STRUK (UPDATED: INV NUMBER JELAS) ---
 function renderStruk(data) {
+    // 1. Header Toko
     document.querySelector('.struk-header h2').innerText = storeConfig.store_name;
     document.querySelector('.struk-header p').innerText = storeConfig.store_address;
+    
+    // 2. Footer
     document.querySelector('.struk-footer p:first-child').innerText = storeConfig.store_footer;
-    strukContent.innerHTML = `<div style="border-bottom:1px dashed #000; padding-bottom:5px; margin-bottom:5px; font-size:12px;">Order: ${data.order_number}<br>${data.order_type} / <strong>${data.customer_name}</strong></div>`;
-    data.items.forEach(i => strukContent.innerHTML += `<div class="struk-item"><span>${i.name} (${i.qty})</span><span>${(i.price*i.qty).toLocaleString('id-ID')}</span></div>`);
-    strukContent.innerHTML += `<hr style="border-top:1px dashed #000; margin:5px 0;"><div class="struk-item"><span>Total</span><span>${data.grand_total.toLocaleString('id-ID')}</span></div>`;
-    strukTotal.innerText = "Rp " + data.grand_total.toLocaleString('id-ID'); 
-    strukDate.innerText = new Date().toLocaleString('id-ID'); strukId.innerText = data.order_number;
+    strukDate.innerText = new Date(data.created_at || Date.now()).toLocaleString('id-ID'); 
+    strukId.innerText = ""; // Kita pindahkan ID ke atas biar jelas
+
+    // 3. Konten Body Struk
+    let itemsHtml = '';
+    data.items.forEach(i => {
+        itemsHtml += `
+            <div class="struk-item">
+                <span>${i.qty}x ${i.name}</span>
+                <span>${(i.price * i.qty).toLocaleString('id-ID')}</span>
+            </div>`;
+    });
+
+    const taxAmount = data.tax || 0;
+    const serviceAmount = data.service || 0;
+    
+    // FORMAT STRUK BARU
+    strukContent.innerHTML = `
+        <div style="text-align:center; margin-bottom:10px; padding-bottom:10px; border-bottom:2px dashed #000;">
+            <h3 style="margin:0; font-size:16px; letter-spacing:1px;">${data.order_number}</h3>
+            <span style="font-size:10px; color:#555;">${data.order_type.toUpperCase()} / <strong>${data.customer_name}</strong></span>
+            ${data.table_number ? `<br><span style="font-size:10px;">Meja: ${data.table_number}</span>` : ''}
+        </div>
+        
+        <div style="margin-bottom:10px;">
+            ${itemsHtml}
+        </div>
+
+        <hr style="border-top:1px dashed #000; margin:10px 0;">
+        
+        <div class="struk-item"><span>Subtotal</span><span>${data.subtotal.toLocaleString('id-ID')}</span></div>
+        ${taxAmount > 0 ? `<div class="struk-item"><span>Tax</span><span>${taxAmount.toLocaleString('id-ID')}</span></div>` : ''}
+        ${serviceAmount > 0 ? `<div class="struk-item"><span>Service</span><span>${serviceAmount.toLocaleString('id-ID')}</span></div>` : ''}
+        
+        <div class="struk-item" style="font-weight:bold; font-size:16px; margin-top:5px; border-top:1px solid #000; padding-top:5px;">
+            <span>TOTAL</span><span>Rp ${data.grand_total.toLocaleString('id-ID')}</span>
+        </div>
+        
+        <div style="margin-top:10px; font-size:11px; color:#333;">
+            <div class="struk-item"><span>Bayar (${data.payment_method.toUpperCase()})</span><span>${data.amount_received.toLocaleString('id-ID')}</span></div>
+            ${data.change_amount > 0 ? `<div class="struk-item"><span>Kembali</span><span>${data.change_amount.toLocaleString('id-ID')}</span></div>` : ''}
+        </div>
+    `;
+
+    // Reset display total bawah karena sudah ada di body
+    strukTotal.innerText = "";
 }
 
 if (btnTutupStruk) btnTutupStruk.addEventListener('click', () => { modalStruk.style.display = "none"; cart = []; updateCartUI(); });

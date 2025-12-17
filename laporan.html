@@ -3,42 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan - Neon</title>
+    <title>Laporan Lengkap - Neon</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Poppins', sans-serif; background: #1a1a2e; color: white; padding: 20px; }
-        .controls { background: #16213e; padding: 20px; border-radius: 15px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* CONTROLS AREA */
+        .controls { background: #16213e; padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        
         .btn-filter { background: #1a1a2e; border: 1px solid #555; color: #ccc; padding: 8px 20px; border-radius: 20px; cursor: pointer; transition: 0.3s; }
         .btn-filter.active, .btn-filter:hover { background: #00ff88; color: black; border-color: #00ff88; font-weight: bold; }
-        #report-area { background: white; color: #333; padding: 40px; border-radius: 5px; min-height: 600px; max-width: 900px; margin: 0 auto; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 20px; }
-        th { background: #333; color: white; padding: 10px; text-align: left; }
-        td { padding: 10px; border-bottom: 1px solid #eee; }
+        
+        /* SEARCH INPUT */
+        .search-box { margin-top: 15px; display: flex; gap: 10px; }
+        .input-search { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #444; background: #0f3460; color: white; outline: none; }
+        .input-search::placeholder { color: #aaa; }
+        
+        /* REPORT AREA */
+        #report-area { background: white; color: #333; padding: 40px; border-radius: 5px; min-height: 600px; max-width: 1000px; margin: 0 auto; box-shadow: 0 0 50px rgba(0,0,0,0.5); overflow-x: auto; }
+        
+        /* SUMMARY CARDS */
         .summary-box { display: flex; gap: 20px; margin-bottom: 20px; }
         .s-card { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd; }
         .s-val { font-size: 24px; font-weight: bold; color: #28a745; }
-        #report-area { overflow-x: auto; }
+        
+        /* TABLE STYLING */
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 20px; }
+        th { background: #333; color: white; padding: 12px; text-align: left; white-space: nowrap; }
+        td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+        tr:hover { background-color: #f9f9f9; }
 
-        /* Pagination Style */
+        /* BADGES */
+        .badge-pay { padding: 3px 8px; border-radius: 5px; font-weight: bold; font-size: 10px; text-transform: uppercase; color: white; }
+        .bg-cash { background: #28a745; } /* Hijau */
+        .bg-qris { background: #6f42c1; } /* Ungu */
+        .bg-edc { background: #007bff; }  /* Biru */
+
+        /* PAGINATION */
         .pagination { display: flex; justify-content: center; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px dashed #ccc; }
-        .btn-page { padding: 5px 15px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-page { padding: 8px 15px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; }
         .btn-page:disabled { background: #ccc; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
     <div class="controls" data-html2canvas-ignore="true">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h2>📊 Laporan Transaksi</h2>
             <button onclick="downloadPDF()" style="background:#ff4757; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">Download PDF</button>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
             <button class="btn-filter active" onclick="setFilter('today', this)">Hari Ini</button>
             <button class="btn-filter" onclick="setFilter('week', this)">Minggu Ini</button>
             <button class="btn-filter" onclick="setFilter('month', this)">Bulan Ini</button>
-            <input type="date" id="custom-date" onchange="setFilter('custom', this)" style="padding:8px; border-radius:5px; border:none; color:black; background:white;">
+            <input type="date" id="custom-date" onchange="setFilter('custom', this)" style="padding:7px; border-radius:15px; border:none; color:black; background:white;">
         </div>
+
+        <div class="search-box">
+            <input type="text" id="search-input" class="input-search" placeholder="🔍 Cari Order ID (INV-...) atau Nama Pelanggan..." onkeyup="handleSearch(event)">
+            <button onclick="loadReportData()" style="padding:0 20px; background:#00ff88; color:black; font-weight:bold; border:none; border-radius:10px; cursor:pointer;">CARI</button>
+        </div>
+
         <a href="admin.html" style="display:inline-block; margin-top:15px; color:#aaa; text-decoration:none;">⬅️ Kembali ke Dashboard</a>
     </div>
 
@@ -47,13 +74,24 @@
             <h2 id="store-name" style="margin:0;">CUAN-IN REPORT</h2>
             <p id="period-display" style="margin:5px 0; color:#666;">Periode: -</p>
         </div>
+
         <div class="summary-box">
             <div class="s-card">TOTAL OMZET<br><div class="s-val" id="tot-omzet">Rp 0</div></div>
             <div class="s-card">TRANSAKSI<br><div class="s-val" id="tot-trx" style="color:#333;">0</div></div>
         </div>
         
         <table>
-            <thead><tr><th>Waktu</th><th>No. Order</th><th>Pelanggan</th><th>Items</th><th>Total</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Tanggal</th>
+                    <th>Waktu</th>
+                    <th>No. Order</th>
+                    <th>Pelanggan</th>
+                    <th>Metode</th>
+                    <th style="width:30%;">Items</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
             <tbody id="tabel-laporan"></tbody>
         </table>
 
@@ -79,9 +117,8 @@
         let currentPage = 1;
         const itemsPerPage = 20;
 
-        // 1. FUNGSI SET FILTER (Triggered by buttons)
+        // 1. FILTER LOGIC
         window.setFilter = (type, btn) => {
-            // Update UI Button Active
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
@@ -104,62 +141,97 @@
             }
 
             if(!currentStartDate) return;
-
             document.getElementById('period-display').innerText = label;
             document.getElementById('print-date').innerText = new Date().toLocaleString('id-ID');
 
-            // Reset ke halaman 1 setiap ganti filter
+            // Reset
             currentPage = 1;
             loadReportData();
         };
 
-        // 2. FUNGSI LOAD DATA UTAMA
-        async function loadReportData() {
-            if(!currentStartDate) return;
+        // Trigger pencarian saat tekan Enter
+        window.handleSearch = (e) => {
+            if (e.key === 'Enter') loadReportData();
+        }
 
-            // --- TASK A: AMBIL SUMMARY (TOTAL OMZET) ---
-            // Kita cuma ambil kolom 'grand_total' biar enteng, gak perlu join order_items
-            const { data: summaryData, error: errSum } = await db
-                .from('orders')
-                .select('grand_total')
-                .gte('created_at', currentStartDate);
+        // 2. LOAD DATA UTAMA
+        window.loadReportData = async () => {
+            if(!currentStartDate) return;
+            const searchTerm = document.getElementById('search-input').value.trim();
+
+            // --- TASK A: HITUNG TOTAL OMZET (SUMMARY) ---
+            // Mengambil semua data (tanpa pagination) untuk dihitung totalnya
+            let querySum = db.from('orders').select('grand_total').gte('created_at', currentStartDate);
             
-            if(!errSum && summaryData) {
+            // Jika ada pencarian, filter juga summary-nya
+            if(searchTerm) {
+                querySum = querySum.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
+            }
+
+            const { data: summaryData } = await querySum;
+            
+            if(summaryData) {
                 const totalOmzet = summaryData.reduce((acc, curr) => acc + curr.grand_total, 0);
                 document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
                 document.getElementById('tot-trx').innerText = summaryData.length;
             }
 
-            // --- TASK B: AMBIL DATA TABEL (PAGINATED) ---
-            // Ini baru ambil detail lengkap tapi cuma 20 baris
+            // --- TASK B: AMBIL DATA TABEL (PAGINATION) ---
             const from = (currentPage - 1) * itemsPerPage;
             const to = from + itemsPerPage - 1;
 
-            const { data: tableData, error: errTable } = await db
-                .from('orders')
+            let queryTable = db.from('orders')
                 .select(`*, order_items(*)`)
                 .gte('created_at', currentStartDate)
                 .order('created_at', {ascending:false})
                 .range(from, to);
 
+            // Tambahkan filter pencarian jika ada
+            if(searchTerm) {
+                queryTable = queryTable.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
+            }
+
+            const { data: tableData, error } = await queryTable;
             const tbody = document.getElementById('tabel-laporan'); 
             tbody.innerHTML = "";
 
-            if(errTable) return alert("Error load table: " + errTable.message);
+            if(error) return alert("Gagal memuat data: " + error.message);
 
-            if(tableData) {
+            if(tableData && tableData.length > 0) {
                 tableData.forEach(d => {
-                    const itemsStr = d.order_items.map(i => `${i.product_name} (${i.qty})`).join(", ");
-                    tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>${d.customer_name}</td><td style="font-size:10px;">${itemsStr}</td><td style="font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td></tr>`;
+                    const dateObj = new Date(d.created_at);
+                    const tanggal = dateObj.toLocaleDateString('id-ID'); // 17/12/2025
+                    const waktu = dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}); // 14:30
+                    
+                    // Format Items
+                    const itemsStr = d.order_items.map(i => `${i.product_name} <b>(${i.qty})</b>`).join("<br>");
+                    
+                    // Badge Metode Bayar
+                    let methodClass = 'bg-cash';
+                    if(d.payment_method === 'qris') methodClass = 'bg-qris';
+                    if(d.payment_method === 'edc') methodClass = 'bg-edc';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${tanggal}</td>
+                            <td>${waktu}</td>
+                            <td style="font-weight:bold; color:#555;">${d.order_number}</td>
+                            <td>${d.customer_name}</td>
+                            <td><span class="badge-pay ${methodClass}">${d.payment_method}</span></td>
+                            <td style="font-size:11px; color:#555;">${itemsStr}</td>
+                            <td style="font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td>
+                        </tr>
+                    `;
                 });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Data tidak ditemukan</td></tr>`;
             }
 
-            // Update Tombol Pagination
+            // Update Kontrol Pagination
             document.getElementById('curr-page').innerText = currentPage;
             document.getElementById('prev-btn').disabled = currentPage === 1;
-            // Disable Next kalau data yang diambil kurang dari limit (artinya udah abis)
             document.getElementById('next-btn').disabled = !tableData || tableData.length < itemsPerPage;
-        }
+        };
 
         // 3. FUNGSI GANTI HALAMAN
         window.changePage = (delta) => {
@@ -167,18 +239,22 @@
             loadReportData();
         };
 
+        // 4. DOWNLOAD PDF
         window.downloadPDF = () => {
             const el = document.getElementById('report-area');
-            // Sembunyikan pagination pas print
-            document.getElementById('pagination-controls').style.display = 'none';
+            document.getElementById('pagination-controls').style.display = 'none'; // Sembunyikan tombol saat print
             
-            html2pdf().set({ margin: 10, filename: 'Laporan.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4' } }).from(el).save().then(() => {
-                // Munculin lagi
-                document.getElementById('pagination-controls').style.display = 'flex';
+            html2pdf().set({ 
+                margin: 5, 
+                filename: `Laporan-${new Date().toISOString().split('T')[0]}.pdf`, 
+                html2canvas: { scale: 2 }, 
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape biar muat tabel lebar
+            }).from(el).save().then(() => {
+                document.getElementById('pagination-controls').style.display = 'flex'; // Munculkan lagi
             });
         };
 
-        // Init Load Hari Ini
+        // Init Default
         setFilter('today', document.querySelector('.btn-filter'));
     </script>
 </body>

@@ -3,43 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kitchen Display - Neon</title>
+    <title>Kitchen Display - Sat Set</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Poppins', sans-serif; background: #1a1a2e; color: white; padding: 20px; }
         
-        /* Header Sat Set */
+        /* HEADER */
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #16213e; padding-bottom: 20px; margin-bottom: 30px; }
         h1 { color: #00ff88; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
         .clock { font-size: 24px; font-weight: bold; color: #aaa; }
 
+        /* GRID SYSTEM */
         #kitchen-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         
-        /* Kartu Pesanan */
-        .ticket { background: #16213e; border-radius: 15px; padding: 0; border: 1px solid rgba(255,255,255,0.05); animation: popIn 0.3s; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        /* KARTU PESANAN */
+        .ticket { background: #16213e; border-radius: 15px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: all 0.3s ease; }
         
+        /* Animasi Masuk */
+        .ticket.new-order { animation: slideIn 0.5s ease-out; border: 2px solid #00ff88; }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
         .ticket-header { background: rgba(0,0,0,0.2); padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .ticket-body { padding: 20px; flex: 1; }
 
-        /* Badge Status */
+        /* BADGES */
         .badge { padding: 5px 12px; border-radius: 20px; font-weight: 800; font-size: 14px; color: black; }
-        .badge-dinein { background: #00ff88; } /* Hijau Neon */
-        .badge-takeaway { background: #f6ad55; } /* Orange */
+        .badge-dinein { background: #00ff88; box-shadow: 0 0 10px rgba(0,255,136,0.3); } 
+        .badge-takeaway { background: #f6ad55; box-shadow: 0 0 10px rgba(246,173,85,0.3); } 
         
-        /* Timer Waktu Tunggu */
-        .timer-badge { font-size: 12px; color: #ccc; display: flex; align-items: center; gap: 5px; margin-top: 5px;}
+        .timer-badge { font-size: 12px; color: #ccc; margin-top: 5px; display:flex; align-items:center; gap:5px; justify-content: flex-end;}
         .timer-badge.late { color: #ff4757; font-weight: bold; animation: blink 2s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
-        /* List Menu */
+        /* LIST ITEM */
         .item-list { list-style: none; padding: 0; margin: 0; }
         .item-list li { margin-bottom: 12px; font-size: 16px; display: flex; gap: 10px; align-items: flex-start; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 12px; }
-        .qty { background: #fff; color: #000; padding: 2px 8px; border-radius: 5px; font-weight: bold; }
+        .qty { background: #fff; color: #000; padding: 2px 8px; border-radius: 5px; font-weight: bold; min-width: 35px; text-align: center; }
 
-        /* Tombol Selesai */
-        .btn-done { width: 100%; padding: 15px; background: #e94560; color: white; border: none; font-weight: 700; font-size: 16px; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
+        /* TOMBOL */
+        .btn-done { width: 100%; padding: 18px; background: #e94560; color: white; border: none; font-weight: 700; font-size: 16px; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
         .btn-done:hover { background: #ff6b81; }
+        .btn-done:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
@@ -48,93 +52,125 @@
 
     <div class="header">
         <h1>👨‍🍳 Dapur Monitor</h1>
-        <div class="clock" id="clock">00:00</div>
+        <div class="clock" id="clock">--:--</div>
     </div>
 
-    <div id="kitchen-container"><div style="text-align:center; color:#555;">Dapur Bersih! Menunggu pesanan...</div></div>
+    <div id="kitchen-container">
+        <div style="text-align:center; color:#555; margin-top:50px;">Memuat data...</div>
+    </div>
 
     <script type="module">
         import { db } from './db-config.js';
 
-        // Update Jam Digital
+        // 1. JAM DIGITAL
         setInterval(() => {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
         }, 1000);
 
-        let lastOrderCount = 0;
+        let existingOrderIds = new Set();
 
+        // 2. FUNGSI UTAMA LOAD ORDERS
         async function loadOrders() {
             const { data: orders, error } = await db.from('orders')
                 .select(`*, order_items(*)`)
                 .eq('status', 'paid')
-                .order('created_at', { ascending: true }); // Yang lama di atas
+                .order('created_at', { ascending: true }); // Yang lama di atas (FIFO)
             
-            if(error) return console.error(error);
+            if(error) return console.error("Gagal load:", error);
             
             const container = document.getElementById('kitchen-container');
             
-            // Cek ada order baru gak? Kalau nambah, bunyiin lonceng!
-            if (orders.length > lastOrderCount && lastOrderCount !== 0) {
-                document.getElementById('notif-sound').play().catch(e => console.log("Perlu interaksi user dulu utk play sound"));
+            // Cek Pesanan Baru (Untuk Bunyi Ting!)
+            const currentIds = new Set(orders.map(o => o.id));
+            const isNewOrder = orders.some(o => !existingOrderIds.has(o.id));
+            
+            if (isNewOrder && existingOrderIds.size > 0) {
+                // Play sound (perlu interaksi user minimal 1x sebelumnya)
+                document.getElementById('notif-sound').play().catch(() => {});
             }
-            lastOrderCount = orders.length;
+            existingOrderIds = currentIds;
 
+            // Render Ulang (Hanya jika jumlah berubah biar gak kedip-kedip parah, tapi untuk MVP kita render ulang aman)
             container.innerHTML = "";
-            if (orders.length === 0) return container.innerHTML = '<div style="text-align:center; color:#555; grid-column:1/-1; margin-top:50px; font-size:20px;">🎉 Dapur Bersih! Santai dulu...</div>';
+            
+            if (orders.length === 0) {
+                return container.innerHTML = '<div style="text-align:center; color:#555; grid-column:1/-1; margin-top:50px; font-size:20px;">🎉 Dapur Bersih! Santai dulu...</div>';
+            }
 
             orders.forEach(data => {
-                // Hitung Waktu Tunggu
+                // Hitung durasi
                 const orderTime = new Date(data.created_at);
                 const diffMs = new Date() - orderTime;
                 const diffMins = Math.floor(diffMs / 60000);
-                const isLate = diffMins > 15; // Merah kalau lebih dari 15 menit
+                const isLate = diffMins > 15;
 
-                // Badge Tipe Order
-                const isTakeaway = data.order_type === 'takeaway' || !data.table_number;
-                const badgeClass = isTakeaway ? 'badge-takeaway' : 'badge-dinein';
-                const badgeText = isTakeaway ? 'TAKEAWAY' : `MEJA ${data.table_number}`;
+                // Tampilan Kartu
+                const badgeHtml = (data.order_type === 'takeaway' || !data.table_number) 
+                    ? `<span class="badge badge-takeaway">TAKEAWAY</span>` 
+                    : `<span class="badge badge-dinein">MEJA ${data.table_number}</span>`;
 
-                // Render Item
                 const itemsHtml = data.order_items.map(i => `
                     <li><span class="qty">${i.qty}x</span> <span>${i.product_name}</span></li>
                 `).join("");
 
                 const card = document.createElement('div');
                 card.className = 'ticket';
+                // Tambahkan class new-order jika baru muncul (opsional logic)
+                
                 card.innerHTML = `
                     <div class="ticket-header">
-                        <span class="badge ${badgeClass}">${badgeText}</span>
-                        <div style="text-align:right;">
-                            <div style="font-weight:bold; font-size:12px;">#${data.order_number.slice(-4)}</div>
-                            <div class="timer-badge ${isLate ? 'late' : ''}">⏳ ${diffMins} mnt lalu</div>
+                        ${badgeHtml}
+                        <div>
+                            <div style="font-weight:bold; font-size:12px; text-align:right;">#${data.order_number.slice(-4)}</div>
+                            <div class="timer-badge ${isLate ? 'late' : ''}">⏳ ${diffMins} mnt</div>
                         </div>
                     </div>
                     <div class="ticket-body">
-                        <div style="margin-bottom:15px; color:#aaa; font-size:14px;">👤 ${data.customer_name}</div>
+                        <div style="margin-bottom:15px; color:#aaa; font-size:14px; border-bottom:1px solid #333; padding-bottom:10px;">
+                            👤 ${data.customer_name || 'Tanpa Nama'}
+                        </div>
                         <ul class="item-list">${itemsHtml}</ul>
                     </div>
-                    <button class="btn-done" onclick="selesaiMasak(${data.id})">✅ PESANAN SIAP</button>
+                    <button class="btn-done" onclick="selesaiMasak(${data.id}, this)">✅ PESANAN SIAP</button>
                 `;
                 container.appendChild(card);
             });
         }
 
-        // EXPOSE TO WINDOW
-        window.selesaiMasak = async (id) => {
-            // Langsung update tanpa confirm (biar sat-set) atau confirm cepat
-            if(confirm("Pesanan selesai?")) {
-                await db.from('orders').update({ status: 'served' }).eq('id', id);
-                // Gak perlu reload manual, realtime subscription bakal handle
+        // 3. FUNGSI SELESAI MASAK (SAT-SET MODE)
+        window.selesaiMasak = async (id, btnElement) => {
+            // A. KONFIRMASI CEPAT
+            if(!confirm("Yakin pesanan ini selesai?")) return;
+
+            // B. UI FIRST (Hapus duluan biar cepat)
+            const card = btnElement.closest('.ticket');
+            if(card) {
+                card.style.transform = "scale(0.8)";
+                card.style.opacity = "0";
+                setTimeout(() => card.remove(), 300); // Hapus DOM setelah animasi
+            }
+
+            // C. PROSES DATABASE DI BACKGROUND
+            const { error } = await db.from('orders').update({ status: 'served' }).eq('id', id);
+            
+            if(error) {
+                alert("Gagal update ke database! Cek koneksi atau izin RLS.");
+                console.error(error);
+                loadOrders(); // Kembalikan kartu jika gagal
             }
         };
 
-        // Realtime Listener
-        db.channel('kitchen').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => loadOrders()).subscribe();
+        // 4. REALTIME LISTENER
+        db.channel('kitchen-updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+                loadOrders(); // Refresh kalau ada order baru/update dari kasir
+            })
+            .subscribe();
         
-        // Refresh timer tiap 1 menit tanpa fetch DB ulang (visual only)
-        setInterval(() => loadOrders(), 60000);
+        // Refresh timer tiap 1 menit
+        setInterval(loadOrders, 60000);
 
+        // First Load
         loadOrders();
     </script>
 </body>

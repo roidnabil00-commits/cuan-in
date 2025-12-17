@@ -51,13 +51,13 @@
         .cat-btn { background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 25px; cursor: pointer; color: var(--text-secondary); transition: 0.3s; white-space: nowrap; font-size: 13px; font-weight: 500; }
         .cat-btn:hover, .cat-btn.active { background: var(--accent-purple); color: white; border-color: var(--accent-purple); box-shadow: 0 4px 15px rgba(118, 75, 162, 0.4); transform: translateY(-2px); }
 
-        /* MENU GRID (PERBAIKAN PADDING BAWAH) */
+        /* MENU GRID */
         #daftar-menu { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
             gap: 15px; 
             overflow-y: auto; 
-            padding-bottom: 150px; /* Spacer besar biar ga ketiban floating button */
+            padding-bottom: 150px; 
             align-content: start; 
             flex-grow: 1;
         }
@@ -69,7 +69,7 @@
         .card::after { content: '+'; position: absolute; bottom: 10px; right: 10px; background: var(--accent-purple); width: 25px; height: 25px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; opacity: 0; transition: 0.3s; transform: translateY(10px); }
         .card:hover::after { opacity: 1; transform: translateY(0); }
 
-        /* CART CONTAINER (PERBAIKAN FLEX & SCROLL) */
+        /* CART CONTAINER */
         #cart-container { 
             flex: 1; 
             padding: 20px; 
@@ -81,12 +81,11 @@
             overflow: hidden; 
         }
 
-        /* DAFTAR ITEM DI CART (SCROLLABLE & PADDING) */
         #cart-items { 
             flex: 1; 
             overflow-y: auto; 
             margin-bottom: 10px; 
-            padding-bottom: 50px; /* Spacer biar item terakhir ga ketutup tombol bayar */
+            padding-bottom: 50px; 
             min-height: 0; 
         }
 
@@ -98,10 +97,9 @@
         .btn-qty { width: 24px; height: 24px; border-radius: 50%; border: none; background: #333; color: white; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .btn-qty.red { background: rgba(255, 71, 87, 0.2); color: var(--danger); }
         
-        /* CHECKOUT AREA (FIXED BOTTOM DI CART) */
         .checkout-area {
-            flex-shrink: 0; /* Jangan menyusut */
-            background: var(--bg-main); /* Kasih background biar nutupin list pas scroll */
+            flex-shrink: 0; 
+            background: var(--bg-main); 
             padding-top: 10px;
             z-index: 10;
         }
@@ -111,7 +109,7 @@
         .btn-bayar:active { transform: scale(0.98); }
         .btn-bayar:disabled { background: #333; color: #555; box-shadow: none; cursor: not-allowed; }
 
-        /* FLOATING BAR (BUTTON LIHAT PESANAN DI HP) */
+        /* MOBILE FLOATING BAR */
         #mobile-cart-bar {
             display: none; 
             position: fixed; bottom: 20px; left: 5%; width: 90%;
@@ -135,20 +133,16 @@
         .btn-logout { background: rgba(255, 71, 87, 0.1); border: 1px solid var(--danger); color: var(--danger); padding: 6px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; }
         .btn-clear { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; text-decoration: underline; }
 
-        /* --- RESPONSIVE CSS (MOBILE FIX) --- */
+        /* MODAL STRUK (FIXED DISPLAY) */
+        .struk-box { background: white; color: black; padding: 20px; width: 320px; border-radius: 10px; font-family: monospace; }
+
+        /* RESPONSIVE */
         @media (max-width: 768px) {
             body { flex-direction: column; }
-            
-            /* MENU GRID DI HP */
             #menu-container { width: 100%; height: 100%; padding: 15px; border: none; overflow: hidden; display: flex; flex-direction: column; }
-            #daftar-menu { 
-                grid-template-columns: repeat(2, 1fr); 
-                gap: 10px; 
-                padding-bottom: 150px; /* JARAK AMAN BESAR BIAR MENU BAWAH GAK KETIBAN */
-            }
+            #daftar-menu { grid-template-columns: repeat(2, 1fr); gap: 10px; padding-bottom: 150px; }
             .card { height: 140px; }
             
-            /* CART DI HP (BOTTOM SHEET) */
             #cart-container {
                 position: fixed; bottom: 0; left: 0; width: 100%; height: 85vh;
                 background: #1a1a2e;
@@ -159,16 +153,11 @@
                 padding: 25px;
                 display: flex;
                 flex-direction: column;
-                z-index: 300; /* Pastikan di atas semuanya */
+                z-index: 300;
             }
             #cart-container.active { transform: translateY(0); }
-            
-            /* LIST ITEM DI HP */
-            #cart-items {
-                padding-bottom: 50px; /* Spacer biar item terakhir bisa discroll naik */
-            }
+            #cart-items { padding-bottom: 50px; }
 
-            /* Elements */
             #mobile-cart-bar { display: flex; }
             #btn-close-cart { display: block; background: rgba(255,255,255,0.1); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; font-weight: bold; cursor: pointer; }
             #cart-container .header-kasir { justify-content: center; position: relative; }
@@ -289,10 +278,9 @@
                 <h2 style="margin:0; color:black; text-shadow:none;">CUAN-IN</h2>
                 <p style="margin:0; font-size:12px; color:black;">Jl. Koding No. 1</p>
             </div>
+            
             <div id="struk-content" style="text-align:left; font-size:12px; margin-bottom:10px;"></div>
-            <div style="border-top:2px dashed #000; padding-top:10px; display:flex; justify-content:space-between; font-weight:bold;">
-                <span>TOTAL</span><span id="struk-total-price">Rp 0</span>
-            </div>
+            
             <div class="struk-footer" style="margin-top:20px; font-size:10px; color:#555;">
                 <p>Terima Kasih!</p>
                 <p id="struk-date">-</p>
@@ -306,14 +294,12 @@
     <script type="module" src="./app.js"></script>
 
     <script>
-        // Fungsi Toggle Cart di HP
         function toggleCartMobile(show) {
             const cart = document.getElementById('cart-container');
             if(show) cart.classList.add('active');
             else cart.classList.remove('active');
         }
 
-        // Observer: Sync Harga
         const btnTotal = document.getElementById('btn-total');
         const mobileDisplay = document.getElementById('mobile-total-display');
         

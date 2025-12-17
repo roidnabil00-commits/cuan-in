@@ -38,10 +38,9 @@
             flex-shrink: 0; 
             z-index: 100;
             transition: transform 0.3s ease;
-            overflow-y: auto; /* PERBAIKAN: Biar bisa discroll kalau layar pendek */
+            overflow-y: auto; 
         }
 
-        /* Scrollbar Sidebar dipercantik */
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         
@@ -58,7 +57,7 @@
         }
         
         .menu-item { 
-            padding: 12px 15px; /* Sedikit dikecilkan biar muat banyak */
+            padding: 12px 15px; 
             cursor: pointer; 
             color: rgba(255,255,255,0.6); 
             transition: 0.3s; 
@@ -95,7 +94,6 @@
         .btn-hamburger { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
         .btn-close-sidebar { display: none; background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
 
-        /* RESPONSIVE */
         @media (max-width: 768px) {
             .sidebar { position: fixed; left: -100%; top: 0; width: 280px; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
             .sidebar.active { left: 0; }
@@ -138,18 +136,17 @@
             <button class="btn-close-sidebar" onclick="toggleSidebar()">✖</button>
         </div>
         
-        <div class="menu-item active" onclick="navTo('dashboard', this)">📊 Dashboard</div>
-        <div class="menu-item" onclick="navTo('menu-mgr', this)">🍔 Kelola Menu</div>
-        <div class="menu-item" onclick="navTo('trx-mgr', this)">🧾 Riwayat</div>
-        <div class="menu-item" onclick="window.location.href='laporan.html'">📄 Laporan</div>
-        <div class="menu-item" onclick="window.location.href='dapur.html'">👨‍🍳 Layar Dapur</div>
-        <div class="menu-item" onclick="navTo('settings', this)">🏢 Pengaturan</div>
+        <div class="menu-item active" onclick="navTo('dashboard', this)">Dashboard</div>
+        <div class="menu-item" onclick="navTo('menu-mgr', this)">Kelola Menu</div>
+        <div class="menu-item" onclick="navTo('trx-mgr', this)">Riwayat</div>
+        <div class="menu-item" onclick="window.location.href='laporan.html'">Laporan</div>
+        <div class="menu-item" onclick="window.location.href='dapur.html'">Layar Dapur</div>
+        <div class="menu-item" onclick="navTo('settings', this)">Pengaturan</div>
         
         <div style="flex-grow: 1; min-height: 20px;"></div> 
 
-        <div class="menu-item" onclick="window.location.href='index.html'" style="background: rgba(0, 255, 136, 0.1); color: var(--green); border: 1px solid rgba(0, 255, 136, 0.2);">⬅️ Ke Kasir</div>
-        <div class="menu-item" onclick="logout()" style="color:var(--neon);">🚪 Logout</div>
-        
+        <a href="index.html" class="menu-item" style="text-decoration:none; background: rgba(0, 255, 136, 0.1); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.2);">Kasir</a>
+        <div class="menu-item" onclick="logout()" style="color:var(--neon);">Logout</div>
         <div style="height: 20px;"></div> 
     </div>
 
@@ -166,7 +163,7 @@
                 <div class="card-stat"><div class="stat-label">Total Transaksi</div><div class="stat-val" id="dash-count">0</div></div>
                 <div class="card-stat"><div class="stat-label">Stok Menipis</div><div class="stat-val" id="dash-stock" style="color:var(--neon);">0</div></div>
             </div>
-            <div class="panel"><h3>📈 Grafik Penjualan</h3><canvas id="salesChart" style="max-height:300px; width:100%;"></canvas></div>
+            <div class="panel"><h3>Grafik Penjualan</h3><canvas id="salesChart" style="max-height:300px; width:100%;"></canvas></div>
         </div>
 
         <div id="menu-mgr" class="section">
@@ -176,8 +173,10 @@
                 <div class="row">
                     <input type="text" id="nama" placeholder="Nama Menu" class="half">
                     <input type="text" id="harga" placeholder="Harga" class="half" onkeyup="formatRupiah(this)">
-                    <input type="number" id="stok" placeholder="Stok" class="half">
                 </div>
+                <div class="row">
+                    <input type="number" id="stok" placeholder="Stok" class="half">
+                    <input type="number" id="diskon" placeholder="Diskon (%)" class="half" min="0" max="100"> </div>
                 <select id="kategori">
                     <option value="Coffee">Coffee</option>
                     <option value="Non-Coffee">Non-Coffee</option>
@@ -241,7 +240,7 @@
                 btn.classList.add('active');
             }
 
-            if(window.innerWidth <= 768) toggleSidebar(); // Auto close di HP
+            if(window.innerWidth <= 768) toggleSidebar(); 
 
             if(sectionId === 'settings') loadSettings();
             if(sectionId === 'trx-mgr') { trxPage = 1; loadTrx(); }
@@ -299,6 +298,7 @@
             });
         }
 
+        // --- CRUD MENU (UPDATED WITH DISCOUNT) ---
         function loadMenu() {
             db.from('products').select('*').order('id', {ascending:true}).then(({ data }) => {
                 const tbody = document.getElementById('tabel-menu'); 
@@ -307,12 +307,73 @@
                 let low = 0;
                 if(data) data.forEach(d => {
                     if(d.stock < 5) low++;
-                    tbody.innerHTML += `<tr><td>${d.name}</td><td>${d.category}</td><td>Rp ${d.price.toLocaleString()}</td><td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td><td><button style="background:#f6ad55; padding:5px 10px;" onclick="editMenu(${d.id}, '${d.name}', ${d.price}, '${d.category}', ${d.stock})">✏️</button> <button style="background:#ff4757; color:white; padding:5px 10px;" onclick="delMenu(${d.id})">🗑️</button></td></tr>`;
+                    
+                    // Logic Harga Coret
+                    let priceDisplay = `Rp ${d.price.toLocaleString()}`;
+                    if(d.discount_percent > 0) {
+                        const afterDisc = d.price - (d.price * d.discount_percent / 100);
+                        priceDisplay = `<s style="color:#888; font-size:10px;">${priceDisplay}</s><br><b style="color:#e94560;">Rp ${afterDisc.toLocaleString()}</b>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>
+                                ${d.name} <br>
+                                ${d.discount_percent > 0 ? `<span style="font-size:10px; color:#00ff88; font-weight:bold;">Disc ${d.discount_percent}%</span>` : ''}
+                            </td>
+                            <td>${d.category}</td>
+                            <td>${priceDisplay}</td>
+                            <td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td>
+                            <td style="display:flex; gap:5px;">
+                                <button style="background:#f6ad55; padding:5px 10px;" 
+                                    onclick="editMenu(${d.id}, '${d.name}', ${d.price}, '${d.category}', ${d.stock}, ${d.discount_percent || 0})">✏️</button> 
+                                <button style="background:#ff4757; color:white; padding:5px 10px;" onclick="delMenu(${d.id})">🗑️</button>
+                            </td>
+                        </tr>`;
                 });
                 document.getElementById('dash-stock').innerText = low;
             });
         }
 
+        window.editMenu = (id, n, h, k, s, disc) => {
+            document.getElementById('menu-id').value = id;
+            document.getElementById('nama').value = n;
+            document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(h);
+            document.getElementById('stok').value = s;
+            document.getElementById('diskon').value = disc; // Set Value Diskon
+            document.getElementById('kategori').value = k;
+            document.getElementById('btn-simpan-menu').innerText = "UPDATE";
+            document.getElementById('btn-batal').style.display = "inline-block";
+        };
+
+        window.resetForm = () => {
+            document.getElementById('menu-id').value = ""; document.getElementById('nama').value = "";
+            document.getElementById('harga').value = ""; document.getElementById('stok').value = "";
+            document.getElementById('diskon').value = ""; // Reset Diskon
+            document.getElementById('btn-simpan-menu').innerText = "SIMPAN MENU";
+            document.getElementById('btn-batal').style.display = "none";
+        };
+
+        window.delMenu = async (id) => { if(confirm("Hapus?")) { await db.from('products').delete().eq('id', id); loadMenu(); } };
+
+        document.getElementById('btn-simpan-menu').addEventListener('click', async () => {
+            const id = document.getElementById('menu-id').value;
+            const p = {
+                name: document.getElementById('nama').value,
+                price: cleanNum(document.getElementById('harga').value),
+                stock: Number(document.getElementById('stok').value),
+                discount_percent: Number(document.getElementById('diskon').value), // Simpan Diskon
+                category: document.getElementById('kategori').value
+            };
+
+            if(!p.name) return alert("Nama wajib!");
+            if(id) await db.from('products').update(p).eq('id', id); 
+            else await db.from('products').insert(p);
+            
+            alert("Berhasil!"); window.resetForm(); loadMenu();
+        });
+
+        // --- RIWAYAT ---
         window.changeTrxPage = (delta) => { trxPage += delta; loadTrx(); };
 
         async function loadTrx() {
@@ -340,34 +401,10 @@
             });
         }
 
-        // CRUD
-        window.editMenu = (id, n, h, k, s) => {
-            document.getElementById('menu-id').value = id;
-            document.getElementById('nama').value = n;
-            document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(h);
-            document.getElementById('stok').value = s;
-            document.getElementById('kategori').value = k;
-            document.getElementById('btn-simpan-menu').innerText = "UPDATE";
-            document.getElementById('btn-batal').style.display = "inline-block";
-        };
-        window.resetForm = () => {
-            document.getElementById('menu-id').value = ""; document.getElementById('nama').value = "";
-            document.getElementById('harga').value = ""; document.getElementById('stok').value = "";
-            document.getElementById('btn-simpan-menu').innerText = "SIMPAN MENU";
-            document.getElementById('btn-batal').style.display = "none";
-        };
-        window.delMenu = async (id) => { if(confirm("Hapus?")) { await db.from('products').delete().eq('id', id); loadMenu(); } };
         window.saveSettings = async () => {
             const p = { store_name: document.getElementById('store-name').value, store_phone: document.getElementById('store-phone').value, store_address: document.getElementById('store-address').value, store_footer: document.getElementById('store-footer').value, tax_rate: Number(document.getElementById('tax-rate').value), service_rate: Number(document.getElementById('service-rate').value) };
             await db.from('settings').update(p).eq('id', 1); alert("Tersimpan!");
         };
-        document.getElementById('btn-simpan-menu').addEventListener('click', async () => {
-            const id = document.getElementById('menu-id').value;
-            const p = { name: document.getElementById('nama').value, price: cleanNum(document.getElementById('harga').value), stock: Number(document.getElementById('stok').value), category: document.getElementById('kategori').value };
-            if(!p.name) return alert("Nama wajib!");
-            if(id) await db.from('products').update(p).eq('id', id); else await db.from('products').insert(p);
-            alert("Berhasil!"); window.resetForm(); loadMenu();
-        });
 
         // INIT
         loadDashboard(); loadMenu();

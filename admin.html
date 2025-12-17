@@ -22,28 +22,34 @@
         .section.active { display: block; }
         @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
 
-        /* CARDS */
+        /* CARDS & TABLES */
         .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .card-stat { background: var(--bg-panel); padding: 25px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden; }
         .card-stat::after { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background: linear-gradient(90deg, var(--neon), var(--accent)); }
         .stat-label { font-size: 13px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
         .stat-val { font-size: 32px; font-weight: 700; margin-top: 10px; text-shadow: 0 0 20px rgba(255,255,255,0.1); }
-
-        /* TABLES & FORMS */
+        
         .panel { background: var(--bg-panel); padding: 25px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
         input, select, textarea { width: 100%; padding: 12px; background: var(--bg-main); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 8px; margin-bottom: 10px; outline: none; }
         button { padding: 12px 25px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; }
         .btn-primary { background: var(--neon); color: white; }
+        
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th { text-align: left; padding: 15px; color: rgba(255,255,255,0.5); font-size: 12px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); }
         td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .row { display: flex; gap: 15px; } .half { flex: 1; }
+
+        /* PAGINATION STYLE */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; }
+        .btn-page { background: var(--accent); color: white; padding: 8px 15px; font-size: 12px; border-radius: 5px; }
+        .btn-page:disabled { opacity: 0.5; cursor: not-allowed; }
+        .page-info { font-size: 12px; color: #888; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <div class="brand">CUAN-IN</div>
+        <div class="brand">🚀 CUAN-IN</div>
         <div class="menu-item active" onclick="showSection('dashboard', this)">Dashboard</div>
         <div class="menu-item" onclick="showSection('menu-mgr', this)">Kelola Menu</div>
         <div class="menu-item" onclick="showSection('trx-mgr', this)">Riwayat</div>
@@ -51,7 +57,7 @@
         <div class="menu-item" onclick="window.location.href='dapur.html'">Layar Dapur</div>
         <div class="menu-item" onclick="showSection('settings', this)">Pengaturan</div>
         
-        <div class="menu-item" onclick="window.location.href='index.html'" style="margin-top:auto;">⬅Ke Kasir</div>
+        <div class="menu-item" onclick="window.location.href='index.html'" style="margin-top:auto;">Kasir</div>
         <div class="menu-item" onclick="logout()" style="color:var(--neon);">Logout</div>
     </div>
 
@@ -101,6 +107,12 @@
                     <thead><tr><th>Waktu</th><th>Order ID</th><th>Total</th><th>Status</th></tr></thead>
                     <tbody id="tabel-transaksi"></tbody>
                 </table>
+                
+                <div class="pagination">
+                    <button class="btn-page" id="prev-btn" onclick="changeTrxPage(-1)">Previous</button>
+                    <span class="page-info">Halaman <span id="curr-page">1</span></span>
+                    <button class="btn-page" id="next-btn" onclick="changeTrxPage(1)">Next</button>
+                </div>
             </div>
         </div>
 
@@ -119,6 +131,10 @@
     <script type="module">
         import { db, auth } from './db-config.js'; 
 
+        // GLOBAL VARS
+        let trxPage = 1;
+        const trxLimit = 10; // Jumlah per halaman
+
         // --- GLOBAL FUNCTIONS ---
         window.logout = async () => { 
             if(confirm("Yakin ingin keluar?")) {
@@ -131,13 +147,12 @@
         window.showSection = (id, btn) => {
             document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            
             if(btn) {
                 document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
                 btn.classList.add('active');
             }
-
             if(id === 'settings') loadSettings(); 
+            if(id === 'trx-mgr') { trxPage = 1; loadTrx(); } // Reset ke halaman 1 saat buka tab
         };
 
         window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
@@ -177,7 +192,6 @@
                   });
                   document.getElementById('dash-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
                   document.getElementById('dash-count').innerText = count;
-                  
                   if(myChart) {
                       myChart.data.labels = Object.keys(salesMap);
                       myChart.data.datasets[0].data = Object.values(salesMap);
@@ -191,25 +205,43 @@
                 const tbody = document.getElementById('tabel-menu'); 
                 if(!tbody) return;
                 tbody.innerHTML = "";
-                let low = 0;
                 if(data) data.forEach(d => {
-                    if(d.stock < 5) low++;
                     tbody.innerHTML += `<tr><td>${d.name}</td><td>${d.category}</td><td>Rp ${d.price.toLocaleString()}</td>
                     <td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td>
                     <td><button style="background:#f6ad55; padding:5px 10px;" onclick="editMenu(${d.id}, '${d.name}', ${d.price}, '${d.category}', ${d.stock})">✏️</button> 
                     <button style="background:#ff4757; color:white; padding:5px 10px;" onclick="delMenu(${d.id})">🗑️</button></td></tr>`;
                 });
-                document.getElementById('dash-stock').innerText = low;
             });
         }
 
-        function loadTrx() {
-            db.from('orders').select('*').order('created_at', {ascending:false}).limit(20).then(({ data }) => {
-                const tbody = document.getElementById('tabel-transaksi'); 
-                if(!tbody) return;
-                tbody.innerHTML = "";
-                if(data) data.forEach(d => tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>Rp ${d.grand_total.toLocaleString()}</td><td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px;">${d.status}</span></td></tr>`);
-            });
+        // --- LOGIKA RIWAYAT DENGAN PAGINATION ---
+        window.changeTrxPage = (delta) => {
+            trxPage += delta;
+            loadTrx();
+        };
+
+        async function loadTrx() {
+            const from = (trxPage - 1) * trxLimit;
+            const to = from + trxLimit - 1;
+
+            // Ambil data dengan range
+            const { data, count } = await db.from('orders')
+                .select('*', { count: 'exact' })
+                .order('created_at', {ascending:false})
+                .range(from, to);
+
+            const tbody = document.getElementById('tabel-transaksi'); 
+            if(!tbody) return;
+            tbody.innerHTML = "";
+            
+            if(data) {
+                data.forEach(d => tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>Rp ${d.grand_total.toLocaleString()}</td><td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px;">${d.status}</span></td></tr>`);
+            }
+
+            // Update UI Pagination
+            document.getElementById('curr-page').innerText = trxPage;
+            document.getElementById('prev-btn').disabled = trxPage === 1;
+            document.getElementById('next-btn').disabled = !data || data.length < trxLimit; // Disable next kalau data habis
         }
 
         function loadSettings() {
@@ -225,7 +257,7 @@
             });
         }
 
-        // --- CRUD HANDLERS ---
+        // --- CRUD MENU HANDLERS ---
         window.editMenu = (id, n, h, k, s) => {
             document.getElementById('menu-id').value = id;
             document.getElementById('nama').value = n;
@@ -282,10 +314,9 @@
         // --- INIT ---
         loadDashboard(); 
         loadMenu(); 
-        loadTrx();
         
         db.channel('admin-updates').on('postgres_changes', { event: '*', schema: 'public' }, () => {
-            loadDashboard(); loadMenu(); loadTrx();
+            loadDashboard(); loadMenu();
         }).subscribe();
     </script>
 </body>

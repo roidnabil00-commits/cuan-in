@@ -19,6 +19,11 @@
         .s-card { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd; }
         .s-val { font-size: 24px; font-weight: bold; color: #28a745; }
         #report-area { overflow-x: auto; }
+
+        /* Pagination Style */
+        .pagination { display: flex; justify-content: center; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px dashed #ccc; }
+        .btn-page { padding: 5px 15px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-page:disabled { background: #ccc; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -29,10 +34,10 @@
             <button onclick="downloadPDF()" style="background:#ff4757; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">Download PDF</button>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn-filter active" onclick="loadReport('today', this)">Hari Ini</button>
-            <button class="btn-filter" onclick="loadReport('week', this)">Minggu Ini</button>
-            <button class="btn-filter" onclick="loadReport('month', this)">Bulan Ini</button>
-            <input type="date" id="custom-date" onchange="loadReport('custom', this)" style="padding:8px; border-radius:5px; border:none; color:black; background:white;">
+            <button class="btn-filter active" onclick="setFilter('today', this)">Hari Ini</button>
+            <button class="btn-filter" onclick="setFilter('week', this)">Minggu Ini</button>
+            <button class="btn-filter" onclick="setFilter('month', this)">Bulan Ini</button>
+            <input type="date" id="custom-date" onchange="setFilter('custom', this)" style="padding:8px; border-radius:5px; border:none; color:black; background:white;">
         </div>
         <a href="admin.html" style="display:inline-block; margin-top:15px; color:#aaa; text-decoration:none;">⬅️ Kembali ke Dashboard</a>
     </div>
@@ -43,13 +48,21 @@
             <p id="period-display" style="margin:5px 0; color:#666;">Periode: -</p>
         </div>
         <div class="summary-box">
-            <div class="s-card">TOTAL OMZET<br><div class="s-val" id="tot-omzet">0</div></div>
+            <div class="s-card">TOTAL OMZET<br><div class="s-val" id="tot-omzet">Rp 0</div></div>
             <div class="s-card">TRANSAKSI<br><div class="s-val" id="tot-trx" style="color:#333;">0</div></div>
         </div>
+        
         <table>
             <thead><tr><th>Waktu</th><th>No. Order</th><th>Pelanggan</th><th>Items</th><th>Total</th></tr></thead>
             <tbody id="tabel-laporan"></tbody>
         </table>
+
+        <div class="pagination" id="pagination-controls">
+            <button class="btn-page" id="prev-btn" onclick="changePage(-1)">Previous</button>
+            <span style="color:black; align-self:center;">Halaman <span id="curr-page">1</span></span>
+            <button class="btn-page" id="next-btn" onclick="changePage(1)">Next</button>
+        </div>
+
         <div style="margin-top:50px; text-align:right; font-size:10px; color:#aaa;">Dicetak: <span id="print-date"></span></div>
     </div>
 
@@ -61,55 +74,112 @@
             if(data) document.getElementById('store-name').innerText = (data.store_name || "CUAN-IN") + " REPORT";
         });
 
-        // GLOBAL FUNCTIONS
-        window.loadReport = async (type, btn) => {
+        // STATE VARIABLES
+        let currentStartDate = "";
+        let currentPage = 1;
+        const itemsPerPage = 20;
+
+        // 1. FUNGSI SET FILTER (Triggered by buttons)
+        window.setFilter = (type, btn) => {
+            // Update UI Button Active
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
             const today = new Date();
-            let startDateStr = "", label = "";
+            let label = "";
 
             if(type === 'today') {
-                startDateStr = today.toISOString().split('T')[0];
+                currentStartDate = today.toISOString().split('T')[0];
                 label = "Hari Ini";
             } else if(type === 'week') {
                 const day = today.getDay() || 7; today.setDate(today.getDate() - day + 1);
-                startDateStr = today.toISOString().split('T')[0];
+                currentStartDate = today.toISOString().split('T')[0];
                 label = "Minggu Ini";
             } else if(type === 'month') {
-                startDateStr = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+                currentStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
                 label = "Bulan Ini";
             } else if(type === 'custom') {
-                startDateStr = document.getElementById('custom-date').value;
-                label = "Tanggal: " + startDateStr;
+                currentStartDate = document.getElementById('custom-date').value;
+                label = "Tanggal: " + currentStartDate;
             }
 
-            if(!startDateStr) return;
+            if(!currentStartDate) return;
+
             document.getElementById('period-display').innerText = label;
             document.getElementById('print-date').innerText = new Date().toLocaleString('id-ID');
 
-            const { data, error } = await db.from('orders').select(`*, order_items(*)`).gte('created_at', startDateStr).order('created_at', {ascending:false});
-            if(error) return alert("Error: " + error.message);
+            // Reset ke halaman 1 setiap ganti filter
+            currentPage = 1;
+            loadReportData();
+        };
 
-            const tbody = document.getElementById('tabel-laporan'); tbody.innerHTML = "";
-            let totalOmzet = 0;
+        // 2. FUNGSI LOAD DATA UTAMA
+        async function loadReportData() {
+            if(!currentStartDate) return;
 
-            data.forEach(d => {
-                totalOmzet += d.grand_total;
-                const itemsStr = d.order_items.map(i => `${i.product_name} (${i.qty})`).join(", ");
-                tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>${d.customer_name}</td><td style="font-size:10px;">${itemsStr}</td><td style="font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td></tr>`;
-            });
+            // --- TASK A: AMBIL SUMMARY (TOTAL OMZET) ---
+            // Kita cuma ambil kolom 'grand_total' biar enteng, gak perlu join order_items
+            const { data: summaryData, error: errSum } = await db
+                .from('orders')
+                .select('grand_total')
+                .gte('created_at', currentStartDate);
+            
+            if(!errSum && summaryData) {
+                const totalOmzet = summaryData.reduce((acc, curr) => acc + curr.grand_total, 0);
+                document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
+                document.getElementById('tot-trx').innerText = summaryData.length;
+            }
 
-            document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
-            document.getElementById('tot-trx').innerText = data.length;
+            // --- TASK B: AMBIL DATA TABEL (PAGINATED) ---
+            // Ini baru ambil detail lengkap tapi cuma 20 baris
+            const from = (currentPage - 1) * itemsPerPage;
+            const to = from + itemsPerPage - 1;
+
+            const { data: tableData, error: errTable } = await db
+                .from('orders')
+                .select(`*, order_items(*)`)
+                .gte('created_at', currentStartDate)
+                .order('created_at', {ascending:false})
+                .range(from, to);
+
+            const tbody = document.getElementById('tabel-laporan'); 
+            tbody.innerHTML = "";
+
+            if(errTable) return alert("Error load table: " + errTable.message);
+
+            if(tableData) {
+                tableData.forEach(d => {
+                    const itemsStr = d.order_items.map(i => `${i.product_name} (${i.qty})`).join(", ");
+                    tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>${d.customer_name}</td><td style="font-size:10px;">${itemsStr}</td><td style="font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td></tr>`;
+                });
+            }
+
+            // Update Tombol Pagination
+            document.getElementById('curr-page').innerText = currentPage;
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            // Disable Next kalau data yang diambil kurang dari limit (artinya udah abis)
+            document.getElementById('next-btn').disabled = !tableData || tableData.length < itemsPerPage;
+        }
+
+        // 3. FUNGSI GANTI HALAMAN
+        window.changePage = (delta) => {
+            currentPage += delta;
+            loadReportData();
         };
 
         window.downloadPDF = () => {
-            html2pdf().set({ margin: 10, filename: 'Laporan.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4' } }).from(document.getElementById('report-area')).save();
+            const el = document.getElementById('report-area');
+            // Sembunyikan pagination pas print
+            document.getElementById('pagination-controls').style.display = 'none';
+            
+            html2pdf().set({ margin: 10, filename: 'Laporan.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4' } }).from(el).save().then(() => {
+                // Munculin lagi
+                document.getElementById('pagination-controls').style.display = 'flex';
+            });
         };
 
-        // Init
-        loadReport('today', document.querySelector('.btn-filter'));
+        // Init Load Hari Ini
+        setFilter('today', document.querySelector('.btn-filter'));
     </script>
 </body>
 </html>

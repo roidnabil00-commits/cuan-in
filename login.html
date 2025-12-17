@@ -51,7 +51,7 @@
             errorMsg.style.display = "none";
 
             try {
-                // 1. Cek Login ke Server Supabase
+                // 1. Login ke Supabase
                 const { data, error } = await auth.signInWithPassword({
                     email: email,
                     password: password,
@@ -59,12 +59,30 @@
 
                 if (error) throw error;
 
-                // 2. Jika Berhasil
-                console.log("Login Sukses:", data);
-                localStorage.setItem('user_role', 'owner'); 
-                window.location.href = "admin.html";
+                // 2. Cek Role User ini di tabel 'profiles'
+                const { data: profile, error: profileError } = await db
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', data.user.id)
+                    .single();
+                
+                // Default ke staff jika profil belum ada
+                const userRole = profile ? profile.role : 'staff';
+
+                // Simpan role di localStorage (untuk kemudahan UI, validasi tetap di server)
+                localStorage.setItem('user_role', userRole);
+
+                // 3. Arahkan sesuai jabatan
+                if (userRole === 'owner') {
+                    // Jika Owner -> Masuk Admin Dashboard
+                    window.location.href = "admin.html";
+                } else {
+                    // Jika Staff/Kasir -> Langsung ke Mesin Kasir
+                    window.location.href = "index.html";
+                }
 
             } catch (error) {
+                // ... (kode error handling tetap sama)
                 // 3. Jika Gagal
                 console.error("Login Gagal:", error);
                 

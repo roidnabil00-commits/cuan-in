@@ -252,18 +252,27 @@
 
         // --- AUTH ---
         async function checkSession() {
+            // 1. Cek apakah ada sesi login?
             const { data: { session } } = await auth.getSession();
-            if (!session) window.location.href = "login.html";
-        }
-        checkSession();
-
-        window.logout = async () => { 
-            if(confirm("Keluar dari Admin?")) {
-                await auth.signOut();
-                localStorage.removeItem('user_role');
-                window.location.href = "login.html"; 
+            if (!session) {
+                window.location.href = "login.html";
+                return;
             }
-        };
+
+            // 2. VALIDASI KERAS: Cek ke database apakah dia benar-benar OWNER?
+            // Jangan hanya percaya localStorage, hacker bisa edit localStorage.
+            const { data: profile } = await db
+                .from('profiles')
+                .select('role')
+                .eq('id', session.user.id)
+                .single();
+
+            // Jika bukan owner, tendang ke halaman kasir
+            if (!profile || profile.role !== 'owner') {
+                alert("⛔ Akses Ditolak! Halaman ini khusus Owner.");
+                window.location.href = "index.html"; 
+            }
+        }
 
         // --- HELPER ---
         window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));

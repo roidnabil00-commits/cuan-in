@@ -331,5 +331,35 @@
             }
         };
     </script>
+    <script type="module">
+    import { db, auth } from './db-config.js';
+    
+    // Cek Role untuk UI
+    async function setupUI() {
+        const { data: { session } } = await auth.getSession();
+        if(session) {
+            const { data: profile } = await db.from('profiles').select('role').eq('id', session.user.id).single();
+            
+            // Jika Owner, ubah tombol logout jadi tombol "Ke Dashboard"
+            // Atau tambahkan tombol dashboard di sebelahnya
+            if(profile && profile.role === 'owner') {
+                const header = document.querySelector('.header-kasir');
+                const btnDash = document.createElement('button');
+                btnDash.innerText = "DASHBOARD";
+                btnDash.className = "btn-logout"; // Pakai style yg sama
+                btnDash.style.marginRight = "10px";
+                btnDash.style.borderColor = "#00ff88";
+                btnDash.style.color = "#00ff88";
+                btnDash.style.background = "transparent";
+                btnDash.onclick = () => window.location.href = "admin.html";
+                
+                // Sisipkan sebelum tombol logout
+                const btnLogout = document.querySelector('.btn-logout');
+                header.insertBefore(btnDash, btnLogout);
+            }
+        }
+    }
+    setupUI();
+</script>
 </body>
 </html>

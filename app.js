@@ -147,15 +147,18 @@ function updateCartUI() {
             </div>`;
     });
 
-    const tax = subtotal * ((storeConfig.tax_rate || 0) / 100);
-    const service = subtotal * ((storeConfig.service_rate || 0) / 100);
-    let grand = subtotal + tax + service;
-    
-    let discountAmount = 0;
+     let discountAmount = 0;
     if(globalDiscount > 0) {
-        discountAmount = grand * (globalDiscount / 100);
-        grand = grand - discountAmount;
+        discountAmount = subtotal * (globalDiscount / 100);
     }
+    const subtotalAfterDisc = subtotal - discountAmount;
+
+    // 2. Hitung Pajak & Service (Dari harga setelah diskon)
+    const tax = subtotalAfterDisc * ((storeConfig.tax_rate || 0) / 100);
+    const service = subtotalAfterDisc * ((storeConfig.service_rate || 0) / 100);
+
+    // 3. Total Akhir
+    let grand = subtotalAfterDisc + tax + service;
 
     subtotalEl.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>Subtotal</span><span>${subtotal.toLocaleString('id-ID')}</span></div>

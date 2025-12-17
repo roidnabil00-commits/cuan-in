@@ -46,18 +46,18 @@ loadConfig();
 
 // --- 1. MENU LOGIC (DENGAN ERROR CHECKING) ---
 async function fetchMenu() {
-    // Ambil data
+    console.log("Sedang mengambil menu..."); 
+
     const { data, error } = await db.from('products').select('*').order('id', { ascending: true });
 
-    // CEK ERROR DISINI
     if (error) {
         console.error("❌ ERROR MENU:", error);
-        alert("Gagal ambil menu: " + error.message + "\nCoba cek SQL RLS di Supabase!");
+        alert("Gagal ambil menu: " + error.message + "\n\nSolusi: Cek SQL RLS di Supabase!");
         return;
     }
 
     if (!data || data.length === 0) {
-        daftarMenuEl.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#888;">Menu Kosong (Isi data di Admin dulu).</p>`;
+        daftarMenuEl.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#888;">Menu Kosong. Silakan isi di Admin dulu.</p>`;
         return;
     }
 
@@ -72,7 +72,7 @@ db.channel('public:products')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchMenu())
     .subscribe();
 
-fetchMenu(); // Jalankan
+fetchMenu(); 
 
 // --- RENDER MENU ---
 window.filterMenu = (kategori, btnElement) => {
@@ -109,7 +109,7 @@ function renderMenu(kategori) {
     });
 }
 
-// --- CART & PAYMENT (Logic sama, diringkas) ---
+// --- CART & PAYMENT ---
 window.addToCart = (id) => {
     const item = cart.find(i => i.id === id);
     const product = productsCache[id];
@@ -156,7 +156,6 @@ function updateCartUI() {
     btnCheckout.disabled = false;
 }
 
-// --- PEMBAYARAN ---
 const cleanNum = (val) => Number(String(val).replace(/\./g, "").replace(/,/g, ""));
 const formatNum = (num) => new Intl.NumberFormat('id-ID').format(num);
 
@@ -236,6 +235,7 @@ window.processFinalPayment = async () => {
     } catch (e) { alert("Error: " + e.message); }
 };
 
+// --- BAGIAN INI SUDAH DIPERBAIKI (TIDAK TERPOTONG LAGI) ---
 function renderStruk(data) {
     document.querySelector('.struk-header h2').innerText = storeConfig.store_name;
     document.querySelector('.struk-header p').innerText = storeConfig.store_address;

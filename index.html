@@ -197,7 +197,7 @@
 
             <div id="area-qris" style="display:none;">
                 <div style="background:white; padding:10px; display:inline-block; border-radius:10px;">
-                    <img src="https://via.placeholder.com/150?text=QRIS" width="150">
+                    <img src="qris.jpg" width="150">
                 </div>
                 <p style="font-size:12px; color:#aaa; margin-top:10px;">Scan QRIS di atas</p>
             </div>
@@ -235,9 +235,6 @@
 
     <script type="module">
         // Import auth dari settingan database kita
-        import { auth } from './db-config.js'; 
-
-        const loginForm = document.getElementById('login-form');
         const errorMsg = document.getElementById('error-msg');
         const btnLogin = document.getElementById('btn-login');
 
@@ -275,6 +272,8 @@
             }
         });
     </script>
+    <script type="module" src="./app.js"></script>
+
     <script type="module">
         import { auth } from './db-config.js';
 
@@ -296,5 +295,7 @@
             }
         };
     </script>
+</body>
+</html>
 </body>
 </html>

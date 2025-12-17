@@ -44,13 +44,13 @@
 
     <div class="sidebar">
         <div class="brand">🚀 CUAN-IN</div>
-        <div class="menu-item active" onclick="showSection('dashboard', this)">Dashboard</div>
-        <div class="menu-item" onclick="showSection('menu-mgr', this)">Kelola Menu</div>
-        <div class="menu-item" onclick="showSection('trx-mgr', this)">Riwayat</div>
-        <div class="menu-item" onclick="window.location.href='laporan.html'">Laporan</div>
-        <div class="menu-item" onclick="showSection('settings', this)">Pengaturan</div>
-        <div class="menu-item" onclick="window.location.href='index.html'" style="margin-top:auto;">Kasir</div>
-        <div class="menu-item" onclick="logout()" style="color:var(--neon);">Logout</div>
+        <div class="menu-item active" onclick="showSection('dashboard', this)">📊 Dashboard</div>
+        <div class="menu-item" onclick="showSection('menu-mgr', this)">🍔 Kelola Menu</div>
+        <div class="menu-item" onclick="showSection('trx-mgr', this)">🧾 Riwayat</div>
+        <div class="menu-item" onclick="window.location.href='laporan.html'">📄 Laporan</div>
+        <div class="menu-item" onclick="showSection('settings', this)">🏢 Pengaturan</div>
+        <div class="menu-item" onclick="window.location.href='index.html'" style="margin-top:auto;">⬅️ Ke Kasir</div>
+        <div class="menu-item" onclick="logout()" style="color:var(--neon);">🚪 Logout</div>
     </div>
 
     <div class="content">
@@ -117,40 +117,58 @@
     <script type="module">
         import { db, auth } from './db-config.js'; 
 
-        // --- 1. CEK KEAMANAN (SATPAM) ---
-        // Fungsi ini jalan otomatis saat halaman dibuka
+        // --- 1. DEFINISIKAN FUNGSI GLOBAL DULU (PENTING!) ---
+        // Biar tombol onclick di HTML langsung bisa akses ini.
+        
+        window.logout = async () => { 
+            if(confirm("Yakin ingin keluar?")) {
+                await auth.signOut();
+                localStorage.removeItem('user_role');
+                window.location.href = "login.html"; 
+            }
+        };
+        
+        window.showSection = (id, btn) => {
+            document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            // Highlight sidebar
+            if(btn) {
+                document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
+                btn.classList.add('active');
+            }
+
+            if(id === 'settings') loadSettings(); 
+        };
+
+        window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
+        const cleanNum = (v) => Number(String(v).replace(/\./g,''));
+
+        // --- 2. CEK SESI LOGIN ---
         async function checkSession() {
             const { data: { session } } = await auth.getSession();
-            
-            // Kalau tidak ada sesi login (belum login), tendang ke login.html
             if (!session) {
                 window.location.href = "login.html";
             }
         }
         checkSession();
 
-        // --- 2. FUNGSI LOGOUT (Global) ---
-        window.logout = async () => { 
-            if(confirm("Yakin ingin keluar?")) {
-                await auth.signOut(); // Hapus sesi di server & browser
-                localStorage.removeItem('user_role');
-                window.location.href = "login.html"; 
+        // --- 3. CHART JS (DENGAN PENGAMAN) ---
+        let myChart = null;
+        try {
+            const ctx = document.getElementById('salesChart');
+            if(ctx && typeof Chart !== 'undefined') {
+                myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Sales', data: [], borderColor: '#00ff88', tension: 0.4 }] },
+                    options: { plugins: { legend: {display:false} }, scales: { y: { grid: { color: 'rgba(255,255,255,0.1)' } } } }
+                });
+            } else {
+                console.warn("Chart.js gagal dimuat atau elemen tidak ditemukan.");
             }
-        };
+        } catch (e) { console.error("Chart Error:", e); }
 
-        // ... (LANJUTKAN DENGAN KODE SISA NYA SEPERTI window.showSection, DLL) ...
-
-        window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
-        const cleanNum = (v) => Number(v.replace(/\./g,''));
-
-        // --- CHART ---
-        let myChart = new Chart(document.getElementById('salesChart'), {
-            type: 'line',
-            data: { labels: [], datasets: [{ label: 'Sales', data: [], borderColor: '#00ff88', tension: 0.4 }] },
-            options: { plugins: { legend: {display:false} }, scales: { y: { grid: { color: 'rgba(255,255,255,0.1)' } } } }
-        });
-
-        // --- LOGIC UTAMA ---
+        // --- 4. LOGIC UTAMA ---
         function loadDashboard() {
             const today = new Date().toISOString().split('T')[0];
             db.from('orders').select('created_at, grand_total').gte('created_at', today).order('created_at', {ascending:true})
@@ -164,17 +182,23 @@
                   });
                   document.getElementById('dash-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
                   document.getElementById('dash-count').innerText = count;
-                  myChart.data.labels = Object.keys(salesMap);
-                  myChart.data.datasets[0].data = Object.values(salesMap);
-                  myChart.update();
+                  
+                  // Update Chart cuma kalau berhasil init tadi
+                  if(myChart) {
+                      myChart.data.labels = Object.keys(salesMap);
+                      myChart.data.datasets[0].data = Object.values(salesMap);
+                      myChart.update();
+                  }
               });
         }
 
         function loadMenu() {
             db.from('products').select('*').order('id', {ascending:true}).then(({ data }) => {
-                const tbody = document.getElementById('tabel-menu'); tbody.innerHTML = "";
+                const tbody = document.getElementById('tabel-menu'); 
+                if(!tbody) return;
+                tbody.innerHTML = "";
                 let low = 0;
-                data.forEach(d => {
+                if(data) data.forEach(d => {
                     if(d.stock < 5) low++;
                     tbody.innerHTML += `<tr><td>${d.name}</td><td>${d.category}</td><td>Rp ${d.price.toLocaleString()}</td>
                     <td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td>
@@ -187,7 +211,9 @@
 
         function loadTrx() {
             db.from('orders').select('*').order('created_at', {ascending:false}).limit(20).then(({ data }) => {
-                const tbody = document.getElementById('tabel-transaksi'); tbody.innerHTML = "";
+                const tbody = document.getElementById('tabel-transaksi'); 
+                if(!tbody) return;
+                tbody.innerHTML = "";
                 if(data) data.forEach(d => tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>Rp ${d.grand_total.toLocaleString()}</td><td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px;">${d.status}</span></td></tr>`);
             });
         }
@@ -195,17 +221,17 @@
         function loadSettings() {
             db.from('settings').select('*').single().then(({ data }) => {
                 if(data) {
-                    document.getElementById('store-name').value = data.store_name||"";
-                    document.getElementById('store-phone').value = data.store_phone||"";
-                    document.getElementById('store-address').value = data.store_address||"";
-                    document.getElementById('store-footer').value = data.store_footer||"";
-                    document.getElementById('tax-rate').value = data.tax_rate||0;
-                    document.getElementById('service-rate').value = data.service_rate||0;
+                    if(document.getElementById('store-name')) document.getElementById('store-name').value = data.store_name||"";
+                    if(document.getElementById('store-phone')) document.getElementById('store-phone').value = data.store_phone||"";
+                    if(document.getElementById('store-address')) document.getElementById('store-address').value = data.store_address||"";
+                    if(document.getElementById('store-footer')) document.getElementById('store-footer').value = data.store_footer||"";
+                    if(document.getElementById('tax-rate')) document.getElementById('tax-rate').value = data.tax_rate||0;
+                    if(document.getElementById('service-rate')) document.getElementById('service-rate').value = data.service_rate||0;
                 }
             });
         }
 
-        // --- CRUD MENU HANDLERS (GLOBAL) ---
+        // --- 5. CRUD MENU HANDLERS (GLOBAL) ---
         window.editMenu = (id, n, h, k, s) => {
             document.getElementById('menu-id').value = id;
             document.getElementById('nama').value = n;
@@ -241,24 +267,29 @@
         };
 
         // Event Listener Tombol Simpan Menu
-        document.getElementById('btn-simpan-menu').addEventListener('click', async () => {
-            const id = document.getElementById('menu-id').value;
-            const p = {
-                name: document.getElementById('nama').value,
-                price: cleanNum(document.getElementById('harga').value),
-                stock: Number(document.getElementById('stok').value),
-                category: document.getElementById('kategori').value
-            };
-            if(!p.name) return alert("Isi nama!");
-            
-            if(id) await db.from('products').update(p).eq('id', id);
-            else await db.from('products').insert(p);
-            
-            alert("Sukses!"); window.resetForm(); loadMenu();
-        });
+        const btnSimpan = document.getElementById('btn-simpan-menu');
+        if(btnSimpan) {
+            btnSimpan.addEventListener('click', async () => {
+                const id = document.getElementById('menu-id').value;
+                const p = {
+                    name: document.getElementById('nama').value,
+                    price: cleanNum(document.getElementById('harga').value),
+                    stock: Number(document.getElementById('stok').value),
+                    category: document.getElementById('kategori').value
+                };
+                if(!p.name) return alert("Isi nama!");
+                
+                if(id) await db.from('products').update(p).eq('id', id);
+                else await db.from('products').insert(p);
+                
+                alert("Sukses!"); window.resetForm(); loadMenu();
+            });
+        }
 
-        // --- INIT ---
-        loadDashboard(); loadMenu(); loadTrx();
+        // --- INIT (Jalankan semua) ---
+        loadDashboard(); 
+        loadMenu(); 
+        loadTrx();
         
         // Realtime Subscribe
         db.channel('admin-updates').on('postgres_changes', { event: '*', schema: 'public' }, () => {

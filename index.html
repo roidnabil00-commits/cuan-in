@@ -5,210 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cuan-in POS</title>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1a2e">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2953/2953363.png">
 
     <style>
-        :root {
-            --bg-main: #1a1a2e;
-            --bg-secondary: #16213e;
-            --text-primary: #ffffff;
-            --text-secondary: #e0e0e0;
-            --accent-purple: #764ba2;
-            --accent-green: #00ff88;
-            --danger: #ff4757;
-            --rounded: 16px;
-        }
-
+        :root { --bg-main: #1a1a2e; --bg-secondary: #16213e; --text-primary: #ffffff; --text-secondary: #e0e0e0; --accent-purple: #764ba2; --accent-green: #00ff88; --danger: #ff4757; --rounded: 16px; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { display: flex; height: 100vh; overflow: hidden; background-color: var(--bg-main); color: var(--text-primary); }
         
-        /* SCROLLBAR */
+        /* SCROLLBAR & INPUTS */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--accent-purple); border-radius: 10px; }
-
-        /* INPUT FIX */
         input, select { color: white !important; background-color: var(--bg-secondary) !important; font-size: 14px; }
         option { background-color: var(--bg-main); color: white; }
 
-        /* --- LAYOUT UTAMA --- */
+        /* LAYOUT */
         #menu-container { flex: 2; padding: 20px; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.05); overflow: hidden; position: relative; }
-        
-        /* HEADER */
         .header-kasir { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; }
-        .header-kasir h2 { font-weight: 800; color: var(--accent-green); letter-spacing: 1px; font-size: 24px; text-shadow: 0 0 15px rgba(0, 255, 136, 0.3); }
-
-        /* TABS KATEGORI */
+        .header-kasir h2 { font-weight: 800; color: var(--accent-green); font-size: 24px; }
+        
         .category-tabs { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 15px; scrollbar-width: none; flex-shrink: 0; }
-        .category-tabs::-webkit-scrollbar { display: none; }
-        .cat-btn { background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 25px; cursor: pointer; color: var(--text-secondary); transition: 0.3s; white-space: nowrap; font-size: 13px; font-weight: 500; }
-        .cat-btn:hover, .cat-btn.active { background: var(--accent-purple); color: white; border-color: var(--accent-purple); box-shadow: 0 4px 15px rgba(118, 75, 162, 0.4); transform: translateY(-2px); }
+        .cat-btn { background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 25px; cursor: pointer; color: var(--text-secondary); white-space: nowrap; }
+        .cat-btn.active { background: var(--accent-purple); color: white; }
 
-        /* MENU GRID */
-        #daftar-menu { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
-            gap: 15px; 
-            overflow-y: auto; 
-            padding-bottom: 150px; 
-            align-content: start; 
-            flex-grow: 1;
-        }
-        
-        .card { background: var(--bg-secondary); padding: 12px; border-radius: var(--rounded); cursor: pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; height: 160px; position: relative; overflow: hidden; }
-        .card:active { transform: scale(0.95); }
-        .card h3 { font-size: 14px; color: white; margin-bottom: 5px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        #daftar-menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; overflow-y: auto; padding-bottom: 150px; align-content: start; flex-grow: 1; }
+        .card { background: var(--bg-secondary); padding: 12px; border-radius: var(--rounded); cursor: pointer; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: space-between; height: 160px; }
         .price { color: var(--accent-green); font-weight: 700; font-size: 15px; margin-top: auto; }
-        .card::after { content: '+'; position: absolute; bottom: 10px; right: 10px; background: var(--accent-purple); width: 25px; height: 25px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; opacity: 0; transition: 0.3s; transform: translateY(10px); }
-        .card:hover::after { opacity: 1; transform: translateY(0); }
 
-        /* CART CONTAINER */
-        #cart-container { 
-            flex: 1; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            background: rgba(0,0,0,0.2); 
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            z-index: 99; 
-            overflow: hidden; 
-        }
-
-        #cart-items { 
-            flex: 1; 
-            overflow-y: auto; 
-            margin-bottom: 10px; 
-            padding-bottom: 50px; 
-            min-height: 0; 
-        }
-
+        #cart-container { flex: 1; padding: 20px; display: flex; flex-direction: column; background: rgba(0,0,0,0.2); transition: 0.3s; z-index: 99; overflow: hidden; }
+        #cart-items { flex: 1; overflow-y: auto; margin-bottom: 10px; padding-bottom: 50px; }
         .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
-        .cart-item-info { flex: 1; }
-        .cart-item-name { display: block; font-weight: 600; font-size: 14px; color: white; }
-        .cart-item-price { font-size: 12px; color: #aaa; }
         .qty-controls { display: flex; align-items: center; gap: 10px; background: var(--bg-main); padding: 5px; border-radius: 20px; }
-        .btn-qty { width: 24px; height: 24px; border-radius: 50%; border: none; background: #333; color: white; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .btn-qty.red { background: rgba(255, 71, 87, 0.2); color: var(--danger); }
-        
-        .checkout-area {
-            flex-shrink: 0; 
-            background: var(--bg-main); 
-            padding-top: 10px;
-            z-index: 10;
-        }
+        .btn-qty { width: 24px; height: 24px; border-radius: 50%; border: none; background: #333; color: white; cursor: pointer; }
+        .btn-bayar { background: var(--accent-green); color: #000; border: none; padding: 16px; width: 100%; font-weight: 800; border-radius: var(--rounded); cursor: pointer; font-size: 16px; margin-top: 10px; }
+        .btn-bayar:disabled { background: #333; color: #555; cursor: not-allowed; }
 
-        .total-section { background: var(--bg-secondary); padding: 15px; border-radius: var(--rounded); margin-bottom: 15px; text-align: center; border: 1px dashed rgba(255,255,255,0.1); }
-        .btn-bayar { background: linear-gradient(135deg, var(--accent-green), #00b894); color: #000; border: none; padding: 16px; width: 100%; font-weight: 800; border-radius: var(--rounded); cursor: pointer; font-size: 16px; box-shadow: 0 4px 20px rgba(0, 255, 136, 0.3); transition: 0.3s; }
-        .btn-bayar:active { transform: scale(0.98); }
-        .btn-bayar:disabled { background: #333; color: #555; box-shadow: none; cursor: not-allowed; }
+        /* MODALS (PAYMENT, SHIFT, VARIANT) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-box { background: var(--bg-secondary); width: 90%; max-width: 400px; padding: 25px; border-radius: 25px; text-align: center; color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-method, .var-btn { flex: 1; padding: 12px; background: var(--bg-main); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 12px; cursor: pointer; margin: 5px; }
+        .var-btn:hover { background: var(--accent-green); color: black; }
+        .modern-input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #444; background: var(--bg-main); outline: none; }
 
-        /* MOBILE FLOATING BAR */
-        #mobile-cart-bar {
-            display: none; 
-            position: fixed; bottom: 20px; left: 5%; width: 90%;
-            background: rgba(22, 33, 62, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 15px 20px; border-radius: 50px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            z-index: 200; border: 1px solid rgba(255,255,255,0.1);
-            justify-content: space-between; align-items: center;
-            cursor: pointer;
-            animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes slideUp { from { transform: translateY(100px); } to { transform: translateY(0); } }
-        #btn-close-cart { display: none; } 
-
-        /* MODAL */
-        #modal-payment, #modal-struk { background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); }
-        .modal-box { background: var(--bg-secondary); width: 90%; max-width: 400px; padding: 25px; border-radius: 25px; text-align: center; color: white; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        .btn-method { flex: 1; padding: 12px; background: var(--bg-main); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
-        .modern-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: var(--bg-main); outline: none; }
-        .btn-logout { background: rgba(255, 71, 87, 0.1); border: 1px solid var(--danger); color: var(--danger); padding: 6px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; }
-        .btn-clear { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; text-decoration: underline; }
-
-        /* MODAL STRUK (FIXED DISPLAY) */
-        .struk-box { background: white; color: black; padding: 20px; width: 320px; border-radius: 10px; font-family: monospace; }
-
-        /* RESPONSIVE */
+        /* MOBILE RESPONSIVE */
         @media (max-width: 768px) {
             body { flex-direction: column; }
-            #menu-container { width: 100%; height: 100%; padding: 15px; border: none; overflow: hidden; display: flex; flex-direction: column; }
-            #daftar-menu { grid-template-columns: repeat(2, 1fr); gap: 10px; padding-bottom: 150px; }
-            .card { height: 140px; }
-            
-            #cart-container {
-                position: fixed; bottom: 0; left: 0; width: 100%; height: 85vh;
-                background: #1a1a2e;
-                border-radius: 25px 25px 0 0;
-                transform: translateY(120%); 
-                box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
-                border-top: 1px solid rgba(255,255,255,0.1);
-                padding: 25px;
-                display: flex;
-                flex-direction: column;
-                z-index: 300;
-            }
+            #menu-container { width: 100%; height: 100%; padding: 15px; border: none; }
+            #cart-container { position: fixed; bottom: 0; left: 0; width: 100%; height: 85vh; background: #1a1a2e; transform: translateY(120%); border-radius: 25px 25px 0 0; z-index: 300; }
             #cart-container.active { transform: translateY(0); }
-            #cart-items { padding-bottom: 50px; }
-
-            #mobile-cart-bar { display: flex; }
-            #btn-close-cart { display: block; background: rgba(255,255,255,0.1); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; font-weight: bold; cursor: pointer; }
-            #cart-container .header-kasir { justify-content: center; position: relative; }
-            #cart-container .header-kasir .btn-clear { position: absolute; right: 0; }
-            #btn-close-cart { position: absolute; left: 0; }
+            #mobile-cart-bar { display: flex; position: fixed; bottom: 20px; left: 5%; width: 90%; background: #16213e; padding: 15px; border-radius: 50px; justify-content: space-between; align-items: center; cursor: pointer; z-index: 200; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         }
-
-        @media print {
-            body * { visibility: hidden; }
-            #modal-struk, #modal-struk * { visibility: visible; }
-            #modal-struk { position: absolute; left: 0; top: 0; width: 100%; height: auto; background: white; color: black; backdrop-filter: none; }
-            #modal-struk button { display: none !important; }
-        }
-   </style>
+    </style>
 </head>
 <body>
 
     <div id="menu-container">
         <div class="header-kasir">
             <h2>🔥 Cuan-in</h2>
-            <button class="btn-logout" onclick="logout()">LOGOUT</button>
+            <button onclick="logout()" style="background:transparent; border:1px solid var(--danger); color:var(--danger); padding:5px 15px; border-radius:20px; cursor:pointer;">TUTUP KASIR</button>
         </div>
-
-        <div class="category-tabs" id="cat-tabs">
+        <div class="category-tabs">
             <button class="cat-btn active" onclick="filterMenu('all', this)">Semua</button>
             <button class="cat-btn" onclick="filterMenu('Coffee', this)">Coffee</button>
             <button class="cat-btn" onclick="filterMenu('Non-Coffee', this)">Non-Coffee</button>
             <button class="cat-btn" onclick="filterMenu('Makanan', this)">Makanan</button>
             <button class="cat-btn" onclick="filterMenu('Snack', this)">Snack</button>
         </div>
-
         <div id="daftar-menu"></div>
     </div>
 
-    <div id="mobile-cart-bar" onclick="toggleCartMobile(true)">
+    <div id="mobile-cart-bar" style="display:none;" onclick="toggleCartMobile(true)">
         <div style="display:flex; align-items:center; gap:10px;">
-            <div style="background:var(--accent-purple); width:35px; height:35px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold;">🛒</div>
+            <div style="background:var(--accent-purple); width:35px; height:35px; border-radius:50%; display:flex; align-items:center; justify-content:center;">🛒</div>
             <div style="font-size:12px; color:#ccc;">Lihat Pesanan</div>
         </div>
-        <div style="font-weight:bold; font-size:16px; color:var(--accent-green);" id="mobile-total-display">Rp 0</div>
+        <div style="font-weight:bold; color:var(--accent-green);" id="mobile-total-display">Rp 0</div>
     </div>
 
     <div id="cart-container">
         <div class="header-kasir">
-            <button id="btn-close-cart" onclick="toggleCartMobile(false)">✕</button>
+            <button onclick="toggleCartMobile(false)" style="background:none; border:none; color:white; font-size:20px;">✕</button>
             <h3>Pesanan</h3>
-            <button class="btn-clear" onclick="clearCart(); toggleCartMobile(false);">Hapus</button>
+            <button onclick="clearCart()" style="background:none; border:none; color:var(--danger);">Hapus</button>
         </div>
-
-        <div class="order-info">
-            <select id="order-type" onchange="toggleTableInput()" class="modern-input">
+        <div style="margin-bottom:10px;">
+            <select id="order-type" class="modern-input">
                 <option value="dine-in">🍽️ Dine In</option>
                 <option value="takeaway">🥡 Takeaway</option>
             </select>
@@ -217,149 +99,94 @@
                 <input type="number" id="table-num" placeholder="Meja" class="modern-input" style="flex:1">
             </div>
         </div>
-
         <div id="cart-items">
             <div style="text-align:center; color:rgba(255,255,255,0.3); margin-top:50px;">Belum ada pesanan</div>
         </div>
-
-        <div class="checkout-area">
-            <div class="total-section" id="total-price" style="font-size:14px; color:#aaa;">
+        <div>
+            <div style="color:#aaa; font-size:14px; padding:10px 0; border-top:1px dashed #444;" id="total-price">
                 Subtotal: 0
             </div>
-            <button id="btn-checkout" class="btn-bayar" disabled>
-                BAYAR <span id="btn-total">Rp 0</span>
-            </button>
+            <button id="btn-checkout" class="btn-bayar" disabled>BAYAR <span id="btn-total">Rp 0</span></button>
         </div>
     </div>
 
-    <div id="modal-payment" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; justify-content: center; align-items: center; z-index: 1001;">
+    <div id="modal-payment" class="modal">
         <div class="modal-box">
-            <h3 style="margin-bottom:15px;">Pembayaran</h3>
+            <h3>Pembayaran</h3>
             <h1 id="pay-total-display" style="color:var(--accent-green); margin-bottom:20px;">Rp 0</h1>
-            
             <div style="display:flex; gap:5px; margin-bottom:20px;">
                 <button onclick="setPaymentMethod('cash')" id="btn-cash" class="btn-method">Tunai</button>
                 <button onclick="setPaymentMethod('qris')" id="btn-qris" class="btn-method">QRIS</button>
                 <button onclick="setPaymentMethod('edc')" id="btn-edc" class="btn-method">EDC</button>
             </div>
-
+            
             <div id="area-cash">
                 <input type="text" id="pay-input" placeholder="Input Nominal" onkeyup="calcChange(this)" class="modern-input" style="text-align:center; font-size:18px;">
-                <div style="margin:15px 0; color:#aaa;">Kembali: <span id="pay-change" style="color:var(--accent-green); font-weight:bold; font-size:20px;">Rp 0</span></div>
-                <div style="display:flex; gap:5px; justify-content:center; flex-wrap:wrap;">
-                    <button onclick="fastCash(20000)" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px;">20k</button>
-                    <button onclick="fastCash(50000)" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px;">50k</button>
-                    <button onclick="fastCash(100000)" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px;">100k</button>
-                    <button onclick="fastCash('pas')" class="btn-method" style="flex:unset; padding:5px 10px; font-size:12px; background:var(--accent-purple);">Pas</button>
+                <div style="margin:10px 0;">Kembali: <span id="pay-change" style="color:var(--accent-green); font-weight:bold;">Rp 0</span></div>
+                <div style="display:flex; gap:5px; justify-content:center;">
+                    <button onclick="fastCash(20000)" class="btn-method">20k</button>
+                    <button onclick="fastCash(50000)" class="btn-method">50k</button>
+                    <button onclick="fastCash(100000)" class="btn-method">100k</button>
+                    <button onclick="fastCash('pas')" class="btn-method" style="background:var(--accent-purple);">Pas</button>
                 </div>
             </div>
 
-            <div id="area-qris" style="display:none;">
-                <div style="background:white; padding:10px; display:inline-block; border-radius:10px;">
-                    <img src="qris.jpg" width="150" alt="QRIS Code">
-                </div>
-                <p style="font-size:12px; color:#aaa; margin-top:10px;">Scan QRIS di atas</p>
-            </div>
+            <div id="area-qris" style="display:none;"><img src="qris.jpg" width="150"><p>Scan QRIS</p></div>
 
-            <div id="area-edc" style="display:none;">
-                <input type="text" id="edc-ref" placeholder="No. Ref Transaksi" class="modern-input">
+            <div id="area-edc" style="display:none; text-align:left;">
+                <p style="font-size:12px; color:#aaa; margin-bottom:5px;">Pilih Bank:</p>
+                <select id="edc-bank" class="modern-input" onchange="updateEdcCode()">
+                    <option value="BRI">BRI</option>
+                    <option value="MANDIRI">MANDIRI</option>
+                    <option value="BCA">BCA</option>
+                </select>
+                <p style="font-size:12px; color:#aaa; margin-bottom:5px;">Kode Referensi (Auto):</p>
+                <input type="text" id="edc-code" class="modern-input" readonly style="color:var(--accent-green); font-weight:bold; text-align:center; border:1px dashed var(--accent-green);">
             </div>
 
             <div style="display:flex; gap:10px; margin-top:20px;">
-                <button onclick="closePayment()" class="btn-method" style="background:rgba(255,255,255,0.1);">Batal</button>
+                <button onclick="document.getElementById('modal-payment').style.display='none'" class="btn-method" style="background:#333;">Batal</button>
                 <button onclick="processFinalPayment()" class="btn-method" style="background:var(--accent-green); color:black; font-weight:bold; flex:2;">PROSES</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-struk" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; justify-content: center; align-items: center; z-index: 1002;">
-        <div class="modal-box" style="background:white; color:black; font-family:monospace; padding:20px; width:320px;">
-            <div class="struk-header" style="border-bottom:2px dashed #000; padding-bottom:10px; margin-bottom:10px;">
-                <h2 style="margin:0; color:black; text-shadow:none;">CUAN-IN</h2>
-                <p style="margin:0; font-size:12px; color:black;">Jl. Koding No. 1</p>
+    <div id="modal-shift" class="modal">
+        <div class="modal-box">
+            <h2 id="shift-title">☀️ Buka Kasir</h2>
+            <p id="shift-desc">Masukkan modal awal di laci kasir</p>
+            <h3 id="shift-expected" style="color:var(--accent-green); display:none;"></h3>
+            <input type="number" id="shift-input" class="modern-input" placeholder="Nominal Uang (Rp)">
+            <button onclick="processShift()" class="btn-bayar" id="btn-shift-action">BUKA KASIR</button>
+        </div>
+    </div>
+
+    <div id="modal-variant" class="modal">
+        <div class="modal-box">
+            <h3>Pilih Varian</h3>
+            <div id="variant-list" style="display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:20px 0;"></div>
+            <button onclick="document.getElementById('modal-variant').style.display='none'" style="background:none; border:none; color:#aaa;">Batal</button>
+        </div>
+    </div>
+
+    <div id="modal-struk" class="modal">
+        <div class="modal-box" style="background:white; color:black; font-family:monospace;">
+            <div style="border-bottom:1px dashed #000; padding-bottom:10px;">
+                <h3 style="margin:0;">CUAN-IN</h3>
+                <small id="struk-date">-</small>
             </div>
-            
-            <div id="struk-content" style="text-align:left; font-size:12px; margin-bottom:10px;"></div>
-            
-            <div class="struk-footer" style="margin-top:20px; font-size:10px; color:#555;">
-                <p>Terima Kasih!</p>
-                <p id="struk-date">-</p>
-                <p id="struk-id">#</p>
-            </div>
-            <button onclick="window.print()" style="width:100%; padding:10px; background:#333; color:white; border:none; margin-top:10px; cursor:pointer;">PRINT</button>
-            <button id="btn-tutup-struk" style="width:100%; padding:10px; background:none; border:1px solid red; color:red; margin-top:5px; cursor:pointer;">TUTUP</button>
+            <div id="struk-content" style="text-align:left; font-size:12px; margin:10px 0;"></div>
+            <button onclick="window.print()" style="width:100%; padding:10px; background:#333; color:white; border:none;">PRINT</button>
+            <button onclick="document.getElementById('modal-struk').style.display='none'" style="width:100%; padding:10px; border:1px solid red; color:red; margin-top:5px; background:white;">TUTUP</button>
         </div>
     </div>
 
     <script type="module" src="./app.js"></script>
-
     <script>
         function toggleCartMobile(show) {
             const cart = document.getElementById('cart-container');
-            if(show) cart.classList.add('active');
-            else cart.classList.remove('active');
+            if(show) cart.classList.add('active'); else cart.classList.remove('active');
         }
-
-        const btnTotal = document.getElementById('btn-total');
-        const mobileDisplay = document.getElementById('mobile-total-display');
-        
-        const observer = new MutationObserver(() => {
-            mobileDisplay.innerText = btnTotal.innerText;
-            if(btnTotal.innerText === 'Rp 0') {
-                document.getElementById('mobile-cart-bar').style.display = 'none';
-                toggleCartMobile(false);
-            } else {
-                if(window.innerWidth <= 768) document.getElementById('mobile-cart-bar').style.display = 'flex';
-            }
-        });
-
-        observer.observe(btnTotal, { childList: true, subtree: true, characterData: true });
     </script>
-
-    <script type="module">
-        import { auth } from './db-config.js';
-        async function checkAuth() {
-            const { data: { session } } = await auth.getSession();
-            if (!session) window.location.href = "login.html";
-        }
-        checkAuth();
-        window.logout = async () => { 
-            if(confirm("Tutup kasir & logout?")) {
-                await auth.signOut();
-                localStorage.removeItem('user_role');
-                window.location.href = "login.html"; 
-            }
-        };
-    </script>
-    <script type="module">
-    import { db, auth } from './db-config.js';
-    
-    // Cek Role untuk UI
-    async function setupUI() {
-        const { data: { session } } = await auth.getSession();
-        if(session) {
-            const { data: profile } = await db.from('profiles').select('role').eq('id', session.user.id).single();
-            
-            // Jika Owner, ubah tombol logout jadi tombol "Ke Dashboard"
-            // Atau tambahkan tombol dashboard di sebelahnya
-            if(profile && profile.role === 'owner') {
-                const header = document.querySelector('.header-kasir');
-                const btnDash = document.createElement('button');
-                btnDash.innerText = "DASHBOARD";
-                btnDash.className = "btn-logout"; // Pakai style yg sama
-                btnDash.style.marginRight = "10px";
-                btnDash.style.borderColor = "#00ff88";
-                btnDash.style.color = "#00ff88";
-                btnDash.style.background = "transparent";
-                btnDash.onclick = () => window.location.href = "admin.html";
-                
-                // Sisipkan sebelum tombol logout
-                const btnLogout = document.querySelector('.btn-logout');
-                header.insertBefore(btnDash, btnLogout);
-            }
-        }
-    }
-    setupUI();
-</script>
 </body>
 </html>

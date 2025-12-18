@@ -132,6 +132,9 @@
         .diff-plus { background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid #00ff88; }
         .diff-minus { background: rgba(233, 69, 96, 0.2); color: #e94560; border: 1px solid #e94560; }
         .diff-pas { background: rgba(255, 255, 255, 0.1); color: #aaa; border: 1px solid #555; }
+
+        /* Tag Varian */
+        .variant-tag { background: #0f3460; padding: 2px 6px; border-radius: 4px; font-size: 10px; color: #ccc; margin-right: 4px; display: inline-block; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -143,7 +146,8 @@
         </div>
         
         <div class="menu-item active" onclick="navTo('dashboard', this)">Dashboard</div>
-        <div class="menu-item" onclick="navTo('shift-mgr', this)">Laporan Shift</div> <div class="menu-item" onclick="navTo('menu-mgr', this)">Kelola Menu</div>
+        <div class="menu-item" onclick="navTo('shift-mgr', this)">Laporan Shift</div>
+        <div class="menu-item" onclick="navTo('menu-mgr', this)">Kelola Menu</div>
         <div class="menu-item" onclick="navTo('trx-mgr', this)">Riwayat</div>
         <div class="menu-item" onclick="window.location.href='laporan.html'">Laporan Detail</div>
         <div class="menu-item" onclick="window.location.href='dapur.html'">Layar Dapur</div>
@@ -202,13 +206,21 @@
                 </div>
                 <div class="row">
                     <input type="number" id="stok" placeholder="Stok" class="half">
-                    <input type="number" id="diskon" placeholder="Diskon (%)" class="half" min="0" max="100"> </div>
+                    <input type="number" id="diskon" placeholder="Diskon (%)" class="half" min="0" max="100">
+                </div>
                 <select id="kategori">
                     <option value="Coffee">Coffee</option>
                     <option value="Non-Coffee">Non-Coffee</option>
                     <option value="Makanan">Makanan</option>
                     <option value="Snack">Snack</option>
                 </select>
+
+                <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px dashed #555;">
+                    <label style="font-size:12px; color:#aaa; display:block; margin-bottom:5px;">Varian / Topping (Opsional)</label>
+                    <input type="text" id="varian-str" placeholder="Contoh: Es:2000, Panas:0 (Format: Nama:TambahanHarga)" style="margin-bottom:5px;">
+                    <small style="color:#888; font-size:10px;">Pisahkan dengan koma. Jika kosong berarti tidak ada varian.</small>
+                </div>
+
                 <div style="margin-top:10px;">
                     <button class="btn-primary" id="btn-simpan-menu">SIMPAN MENU</button>
                     <button id="btn-batal" style="background:#555; color:white; display:none;" onclick="resetForm()">BATAL</button>
@@ -216,7 +228,7 @@
             </div>
             <div class="panel">
                 <table>
-                    <thead><tr><th>Produk</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Aksi</th></tr></thead>
+                    <thead><tr><th>Produk</th><th>Varian</th><th>Harga</th><th>Stok</th><th>Aksi</th></tr></thead>
                     <tbody id="tabel-menu"></tbody>
                 </table>
             </div>
@@ -334,7 +346,7 @@
             });
         }
 
-        // --- FITUR BARU: SHIFT REPORTS (REVISED LOGIC) ---
+        // --- SHIFT REPORTS ---
         async function loadShifts() {
             const { data: shifts, error } = await db
                 .from('shifts')
@@ -352,26 +364,21 @@
                 const staffName = s.profiles ? (s.profiles.full_name || s.profiles.email) : 'Unknown';
                 const endTime = s.end_time ? new Date(s.end_time).toLocaleString('id-ID') : '<span style="color:#f6ad55">Sedang Aktif</span>';
                 
-                // --- LOGIKA HITUNG SELISIH (REVISI) ---
                 const start = Number(s.start_cash || 0);
                 const expected = Number(s.expected_cash || 0);
                 const end = Number(s.end_cash || 0);
                 
-                // 1. Hitung selisih
                 const diff = end - expected;
-                const cleanDiff = Math.round(diff); // Bulatkan angka (0.0001 -> 0)
+                const cleanDiff = Math.round(diff); 
 
                 let selisihHtml = "-";
                 
                 if (s.status === 'closed') {
                     if (cleanDiff === 0) {
-                        // Jika 0, Tulis PAS (Aman)
                         selisihHtml = `<span class="badge-diff diff-pas">✅ Pas (Aman)</span>`;
                     } else if (cleanDiff < 0) {
-                        // Jika minus, tulis "Kurang" tanpa tanda minus ganda
                         selisihHtml = `<span class="badge-diff diff-minus">Kurang Rp ${Math.abs(cleanDiff).toLocaleString('id-ID')}</span>`;
                     } else {
-                        // Jika plus
                         selisihHtml = `<span class="badge-diff diff-plus">Lebih +Rp ${cleanDiff.toLocaleString('id-ID')}</span>`;
                     }
                 }
@@ -389,7 +396,7 @@
             });
         }
 
-        // --- CRUD MENU ---
+        // --- CRUD MENU (FIXED VARIAN) ---
         function loadMenu() {
             db.from('products').select('*').order('id', {ascending:true}).then(({ data }) => {
                 const tbody = document.getElementById('tabel-menu'); 
@@ -403,14 +410,21 @@
                         const afterDisc = d.price - (d.price * d.discount_percent / 100);
                         priceDisplay = `<s style="color:#888; font-size:10px;">${priceDisplay}</s><br><b style="color:#e94560;">Rp ${afterDisc.toLocaleString()}</b>`;
                     }
+                    
+                    // Render Varian di Tabel
+                    let varHtml = '-';
+                    if(d.variants && d.variants.length > 0) {
+                        varHtml = d.variants.map(v => `<span class="variant-tag">${v.name} (+${v.price})</span>`).join("");
+                    }
+
                     tbody.innerHTML += `
                         <tr>
                             <td>${d.name} <br> ${d.discount_percent > 0 ? `<span style="font-size:10px; color:#00ff88; font-weight:bold;">Disc ${d.discount_percent}%</span>` : ''}</td>
-                            <td>${d.category}</td>
+                            <td>${varHtml}</td>
                             <td>${priceDisplay}</td>
                             <td style="color:${d.stock<5?'#ff4757':'#00ff88'}">${d.stock}</td>
                             <td style="display:flex; gap:5px;">
-                                <button style="background:#f6ad55; padding:5px 10px;" onclick="editMenu(${d.id}, '${d.name}', ${d.price}, '${d.category}', ${d.stock}, ${d.discount_percent || 0})">✏️</button> 
+                                <button style="background:#f6ad55; padding:5px 10px;" onclick='editMenu(${JSON.stringify(d)})'>✏️</button> 
                                 <button style="background:#ff4757; color:white; padding:5px 10px;" onclick="delMenu(${d.id})">🗑️</button>
                             </td>
                         </tr>`;
@@ -419,13 +433,21 @@
             });
         }
 
-        window.editMenu = (id, n, h, k, s, disc) => {
-            document.getElementById('menu-id').value = id;
-            document.getElementById('nama').value = n;
-            document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(h);
-            document.getElementById('stok').value = s;
-            document.getElementById('diskon').value = disc; 
-            document.getElementById('kategori').value = k;
+        window.editMenu = (d) => {
+            document.getElementById('menu-id').value = d.id;
+            document.getElementById('nama').value = d.name;
+            document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(d.price);
+            document.getElementById('stok').value = d.stock;
+            document.getElementById('diskon').value = d.discount_percent || 0; 
+            document.getElementById('kategori').value = d.category;
+            
+            // Populate Varian
+            if(d.variants) {
+                document.getElementById('varian-str').value = d.variants.map(v => `${v.name}:${v.price}`).join(', ');
+            } else {
+                document.getElementById('varian-str').value = "";
+            }
+
             document.getElementById('btn-simpan-menu').innerText = "UPDATE";
             document.getElementById('btn-batal').style.display = "inline-block";
         };
@@ -433,7 +455,7 @@
         window.resetForm = () => {
             document.getElementById('menu-id').value = ""; document.getElementById('nama').value = "";
             document.getElementById('harga').value = ""; document.getElementById('stok').value = "";
-            document.getElementById('diskon').value = ""; 
+            document.getElementById('diskon').value = ""; document.getElementById('varian-str').value = ""; 
             document.getElementById('btn-simpan-menu').innerText = "SIMPAN MENU";
             document.getElementById('btn-batal').style.display = "none";
         };
@@ -447,13 +469,24 @@
             const currentStoreId = localStorage.getItem('store_id'); 
             if(!currentStoreId) return alert("Error: Session toko hilang. Silakan login ulang.");
 
+            // PARSE VARIAN
+            const varianStr = document.getElementById('varian-str').value.trim();
+            let variants = [];
+            if(varianStr) {
+                variants = varianStr.split(',').map(s => {
+                    const [name, price] = s.split(':');
+                    return { name: name.trim(), price: Number(price || 0) };
+                });
+            }
+
             const p = {
-                store_id: currentStoreId, // <--- INI YANG KEMARIN LUPA DITAMBAHKAN
+                store_id: currentStoreId,
                 name: document.getElementById('nama').value,
                 price: cleanNum(document.getElementById('harga').value),
                 stock: Number(document.getElementById('stok').value),
                 discount_percent: Number(document.getElementById('diskon').value),
-                category: document.getElementById('kategori').value
+                category: document.getElementById('kategori').value,
+                variants: variants // <--- SIMPAN VARIAN KE DB
             };
 
             if(!p.name) return alert("Nama wajib!");
@@ -469,6 +502,7 @@
                 alert("Gagal simpan: " + err.message);
             }
         });
+
         // --- RIWAYAT ---
         window.changeTrxPage = (delta) => { trxPage += delta; loadTrx(); };
 

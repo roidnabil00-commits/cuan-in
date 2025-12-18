@@ -28,6 +28,18 @@ const els = {
     modalStruk: document.getElementById('modal-struk')
 };
 
+// --- HELPER FORMAT RUPIAH INPUT ---
+window.formatRupiah = (el) => {
+    if(!el.value) return;
+    // 1. Hapus semua karakter selain angka
+    let raw = el.value.replace(/\D/g, '');
+    // 2. Format jadi 1.000.000
+    el.value = Number(raw).toLocaleString('id-ID');
+};
+
+// Helper untuk membersihkan titik sebelum save ke DB
+const cleanNum = (val) => Number(String(val).replace(/\./g,''));
+
 // --- INIT ---
 async function init() {
     if(!storeId) window.location.href = 'login.html';
@@ -57,6 +69,9 @@ async function loadConfig() {
 // --- SHIFT LOGIC ---
 function showShiftModal(mode) {
     els.modalShift.style.display = 'flex';
+    // Reset input value
+    document.getElementById('shift-input').value = "";
+    
     if(mode === 'open') {
         document.getElementById('shift-title').innerText = "☀️ Buka Kasir";
         document.getElementById('shift-desc').innerText = "Masukkan modal awal (uang di laci)";
@@ -77,7 +92,11 @@ function showShiftModal(mode) {
 }
 
 async function openShift() {
-    const startCash = Number(document.getElementById('shift-input').value);
+    // BERSIHKAN TITIK DULU SEBELUM SAVE
+    const startCash = cleanNum(document.getElementById('shift-input').value);
+    
+    if(startCash === 0 && !confirm("Modal 0? Yakin?")) return;
+
     const uid = (await auth.getUser()).data.user.id;
     const { data, error } = await db.from('shifts').insert({
         store_id: storeId, user_id: uid, start_cash: startCash, expected_cash: startCash, status: 'open'
@@ -90,7 +109,9 @@ async function openShift() {
 }
 
 async function closeShift() {
-    const endCash = Number(document.getElementById('shift-input').value);
+    // BERSIHKAN TITIK DULU SEBELUM SAVE
+    const endCash = cleanNum(document.getElementById('shift-input').value);
+    
     await db.from('shifts').update({ end_cash: endCash, end_time: new Date(), status: 'closed' }).eq('id', shiftId);
     await auth.signOut(); localStorage.clear(); window.location.href = 'login.html';
 }
@@ -226,6 +247,8 @@ document.getElementById('btn-checkout').onclick = () => {
     
     document.getElementById('pay-total-display').innerText = "Rp " + currentTransaction.grand_total.toLocaleString();
     window.setPaymentMethod('cash');
+    // Reset input bayar
+    document.getElementById('pay-input').value = "";
     els.modalPay.style.display = 'flex';
 };
 
@@ -246,31 +269,37 @@ window.setPaymentMethod = (m) => {
     document.getElementById('area-qris').style.display = m === 'qris' ? 'block' : 'none';
     document.getElementById('area-edc').style.display = m === 'edc' ? 'block' : 'none';
 
-    // Generate Code if EDC
     if(m === 'edc') window.updateEdcCode();
 };
 
 window.calcChange = (el) => {
-    const val = Number(el.value.replace(/\D/g,''));
-    el.value = val.toLocaleString('id-ID');
+    // 1. Format dulu tampilannya jadi Rupiah
+    window.formatRupiah(el);
+    
+    // 2. Ambil angka aslinya (bersihkan titik) untuk hitung kembalian
+    const val = cleanNum(el.value);
     const change = val - currentTransaction.grand_total;
+    
     document.getElementById('pay-change').innerText = change >= 0 ? "Rp "+change.toLocaleString() : "Kurang!";
 };
 
 window.fastCash = (amt) => {
     const val = amt === 'pas' ? currentTransaction.grand_total : amt;
+    // Format juga tombol fast cash
     document.getElementById('pay-input').value = val.toLocaleString('id-ID');
+    // Trigger hitung kembalian
     window.calcChange(document.getElementById('pay-input'));
 };
 
 window.processFinalPayment = async () => {
-    const payVal = Number(document.getElementById('pay-input').value.replace(/\./g,''));
+    // BERSIHKAN TITIK DULU SEBELUM PROSES
+    const payVal = cleanNum(document.getElementById('pay-input').value);
+    
     if(currentMethod === 'cash' && payVal < currentTransaction.grand_total) return alert("Uang Kurang!");
 
     const finalPay = currentMethod === 'cash' ? payVal : currentTransaction.grand_total;
     const finalChange = currentMethod === 'cash' ? (payVal - currentTransaction.grand_total) : 0;
 
-    // Menyiapkan Nama Metode Pembayaran untuk Database
     let methodToSave = currentMethod.toUpperCase();
     if(currentMethod === 'edc') {
         const bank = document.getElementById('edc-bank').value;
@@ -278,12 +307,10 @@ window.processFinalPayment = async () => {
         methodToSave = `EDC ${bank} (${code})`;
     }
 
-    // Update Transaction Object for Receipt
     currentTransaction.payment_method = methodToSave;
     currentTransaction.amount_received = finalPay;
     currentTransaction.change_amount = finalChange;
 
-    // Save Order
     const { data: order, error } = await db.from('orders').insert({
         store_id: storeId,
         order_number: "INV-" + Date.now().toString().slice(-6),
@@ -302,7 +329,6 @@ window.processFinalPayment = async () => {
 
     if(error) return alert(error.message);
 
-    // Save Items & Update Stock
     for(const item of currentTransaction.items) {
         await db.from('order_items').insert({
             order_id: order.id,
@@ -317,13 +343,11 @@ window.processFinalPayment = async () => {
         if(prod) await db.from('products').update({stock: prod.stock - item.qty}).eq('id', item.productId);
     }
 
-    // Update Shift Cash (Only if Cash)
     if(currentMethod === 'cash') {
         const { data: s } = await db.from('shifts').select('expected_cash').eq('id', shiftId).single();
         await db.from('shifts').update({ expected_cash: s.expected_cash + currentTransaction.grand_total }).eq('id', shiftId);
     }
 
-    // Show Struk
     els.modalPay.style.display = 'none';
     renderStruk(order);
     els.modalStruk.style.display = 'flex';
@@ -331,7 +355,6 @@ window.processFinalPayment = async () => {
 };
 
 function renderStruk(o) {
-    // 1. Header Struk
     const headerHtml = `
         <div style="border-bottom:1px dashed #000; padding-bottom:10px; margin-bottom:10px; text-align:center;">
             <h3 style="margin:0;">${storeConfig.store_name}</h3>
@@ -345,7 +368,6 @@ function renderStruk(o) {
         </div>
     `;
 
-    // 2. Isi Item
     let itemsHtml = '';
     currentTransaction.items.forEach(i => {
         itemsHtml += `
@@ -355,7 +377,6 @@ function renderStruk(o) {
             </div>`;
     });
 
-    // 3. Rincian Harga (Tax, Service, Total)
     const taxHtml = o.tax > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Tax</span><span>${o.tax.toLocaleString()}</span></div>` : '';
     const servHtml = o.service > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Service</span><span>${o.service.toLocaleString()}</span></div>` : '';
 
@@ -374,7 +395,6 @@ function renderStruk(o) {
         <div style="text-align:center; margin-top:15px; font-size:10px;">${storeConfig.store_footer}</div>
     `;
 
-    // Gabungkan ke Modal
     const modalBox = document.querySelector('#modal-struk .modal-box');
     modalBox.innerHTML = `
         ${headerHtml}

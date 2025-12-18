@@ -62,7 +62,7 @@
 
     <div id="menu-container">
         <div class="header-kasir">
-            <h2>Cuan-in</h2>
+            <h2>🔥 Cuan-in</h2>
             <button onclick="logout()" style="background:transparent; border:1px solid var(--danger); color:var(--danger); padding:5px 15px; border-radius:20px; cursor:pointer;">TUTUP KASIR</button>
         </div>
         <div class="category-tabs">
@@ -122,6 +122,7 @@
             
             <div id="area-cash">
                 <input type="text" id="pay-input" placeholder="Input Nominal" onkeyup="calcChange(this)" class="modern-input" style="text-align:center; font-size:18px;">
+                
                 <div style="margin:10px 0;">Kembali: <span id="pay-change" style="color:var(--accent-green); font-weight:bold;">Rp 0</span></div>
                 <div style="display:flex; gap:5px; justify-content:center;">
                     <button onclick="fastCash(20000)" class="btn-method">20k</button>
@@ -153,10 +154,12 @@
 
     <div id="modal-shift" class="modal">
         <div class="modal-box">
-            <h2 id="shift-title">Buka Kasir</h2>
+            <h2 id="shift-title">☀️ Buka Kasir</h2>
             <p id="shift-desc">Masukkan modal awal di laci kasir</p>
             <h3 id="shift-expected" style="color:var(--accent-green); display:none;"></h3>
-            <input type="number" id="shift-input" class="modern-input" placeholder="Nominal Uang (Rp)">
+            
+            <input type="text" id="shift-input" class="modern-input" placeholder="Nominal Uang (Rp)" onkeyup="formatRupiah(this)">
+            
             <button onclick="processShift()" class="btn-bayar" id="btn-shift-action">BUKA KASIR</button>
         </div>
     </div>

@@ -34,8 +34,7 @@
 
     <script type="module">
         // Import Auth dari Supabase
-        import { auth } from './db-config.js'; 
-
+        import { db, auth } from './db-config.js';
         const loginForm = document.getElementById('login-form');
         const errorMsg = document.getElementById('error-msg');
         const btnLogin = document.getElementById('btn-login');

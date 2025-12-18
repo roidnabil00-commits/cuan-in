@@ -442,19 +442,33 @@
 
         document.getElementById('btn-simpan-menu').addEventListener('click', async () => {
             const id = document.getElementById('menu-id').value;
+            
+            // AMBIL STORE ID DARI LOCALSTORAGE
+            const currentStoreId = localStorage.getItem('store_id'); 
+            if(!currentStoreId) return alert("Error: Session toko hilang. Silakan login ulang.");
+
             const p = {
+                store_id: currentStoreId, // <--- INI YANG KEMARIN LUPA DITAMBAHKAN
                 name: document.getElementById('nama').value,
                 price: cleanNum(document.getElementById('harga').value),
                 stock: Number(document.getElementById('stok').value),
                 discount_percent: Number(document.getElementById('diskon').value),
                 category: document.getElementById('kategori').value
             };
-            if(!p.name) return alert("Nama wajib!");
-            if(id) await db.from('products').update(p).eq('id', id); 
-            else await db.from('products').insert(p);
-            alert("Berhasil!"); window.resetForm(); loadMenu();
-        });
 
+            if(!p.name) return alert("Nama wajib!");
+            
+            try {
+                if(id) await db.from('products').update(p).eq('id', id); 
+                else await db.from('products').insert(p);
+                
+                alert("Berhasil disimpan!"); 
+                window.resetForm(); 
+                loadMenu();
+            } catch (err) {
+                alert("Gagal simpan: " + err.message);
+            }
+        });
         // --- RIWAYAT ---
         window.changeTrxPage = (delta) => { trxPage += delta; loadTrx(); };
 

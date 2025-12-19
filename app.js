@@ -307,79 +307,111 @@ window.fastCash = (amt) => {
 };
 
 // --- UPDATE APP.JS: PROCESS PAYMENT ---
+// --- UPDATE APP.JS: PROCESS PAYMENT (ANTI DOUBLE CLICK) ---
 window.processFinalPayment = async () => {
-    const payVal = cleanNum(document.getElementById('pay-input').value);
-    
-    if(currentMethod === 'cash' && payVal < currentTransaction.grand_total) return alert("Uang Kurang!");
+    // 1. AMBIL TOMBOL & CEK APAKAH SEDANG LOADING
+    const btnProses = document.getElementById('btn-process-pay');
+    if (btnProses && btnProses.disabled) return; // Stop jika tombol sedang dimatikan
 
-    const finalPay = currentMethod === 'cash' ? payVal : currentTransaction.grand_total;
-    const finalChange = currentMethod === 'cash' ? (payVal - currentTransaction.grand_total) : 0;
-
-    let methodToSave = currentMethod.toUpperCase();
-    if(currentMethod === 'edc') {
-        const bank = document.getElementById('edc-bank').value;
-        const code = document.getElementById('edc-code').value;
-        methodToSave = `EDC ${bank} (${code})`;
+    // 2. MATIKAN TOMBOL & UBAH TEKS JADI "LOADING..."
+    if (btnProses) {
+        btnProses.disabled = true;
+        btnProses.innerText = "⏳ MEMPROSES...";
+        btnProses.style.backgroundColor = "#555"; // Ubah warna jadi abu biar kelihatan mati
     }
 
-    currentTransaction.payment_method = methodToSave;
-    currentTransaction.amount_received = finalPay;
-    currentTransaction.change_amount = finalChange;
-
-    // HITUNG TOTAL COST (MODAL) UNTUK ORDER INI
-    const totalCostOrder = cart.reduce((sum, item) => sum + (item.cost * item.qty), 0);
-
-    const { data: order, error } = await db.from('orders').insert({
-        store_id: storeId,
-        order_number: "INV-" + Date.now().toString().slice(-6),
-        customer_name: currentTransaction.customer_name,
-        table_number: currentTransaction.table_number,
-        order_type: currentTransaction.order_type,
-        subtotal: currentTransaction.subtotal,
-        tax: currentTransaction.tax,
-        service: currentTransaction.service,
-        grand_total: currentTransaction.grand_total,
-        total_cost: totalCostOrder, // <--- SIMPAN TOTAL MODAL
-        payment_method: methodToSave,
-        amount_received: finalPay,
-        change_amount: finalChange,
-        status: 'paid',
-        cashier_name: currentCashierName 
-    }).select().single();
-
-    if(error) return alert(error.message);
-
-    for(const item of currentTransaction.items) {
-        await db.from('order_items').insert({
-            order_id: order.id,
-            product_id: item.productId,
-            product_name: item.name,
-            qty: item.qty,
-            price_at_purchase: item.price,
-            subtotal: item.price * item.qty
-        });
+    // --- LOGIKA ASLI MULAI DI SINI ---
+    try {
+        // BERSIHKAN TITIK DULU SEBELUM PROSES
+        const payVal = cleanNum(document.getElementById('pay-input').value);
         
-        const {data:prod} = await db.from('products').select('stock').eq('id', item.productId).single();
-        if(prod) await db.from('products').update({stock: prod.stock - item.qty}).eq('id', item.productId);
-    }
+        if(currentMethod === 'cash' && payVal < currentTransaction.grand_total) {
+            throw new Error("Uang Kurang!"); // Lempar ke catch di bawah
+        }
 
-    if(currentMethod === 'cash') {
-        const { data: s } = await db.from('shifts').select('expected_cash').eq('id', shiftId).single();
-        await db.from('shifts').update({ expected_cash: s.expected_cash + currentTransaction.grand_total }).eq('id', shiftId);
-    }
+        const finalPay = currentMethod === 'cash' ? payVal : currentTransaction.grand_total;
+        const finalChange = currentMethod === 'cash' ? (payVal - currentTransaction.grand_total) : 0;
 
-    els.modalPay.style.display = 'none';
-    renderStruk(order);
-    els.modalStruk.style.display = 'flex';
-    
-    // Reset
-    cart = []; 
-    updateCartUI(); 
-    document.getElementById('cust-name').value = ""; 
-    document.getElementById('table-num').value = ""; 
-    document.getElementById('pay-input').value = ""; 
+        let methodToSave = currentMethod.toUpperCase();
+        if(currentMethod === 'edc') {
+            const bank = document.getElementById('edc-bank').value;
+            const code = document.getElementById('edc-code').value;
+            methodToSave = `EDC ${bank} (${code})`;
+        }
+
+        currentTransaction.payment_method = methodToSave;
+        currentTransaction.amount_received = finalPay;
+        currentTransaction.change_amount = finalChange;
+
+        // HITUNG TOTAL COST (MODAL)
+        const totalCostOrder = cart.reduce((sum, item) => sum + ((item.cost || 0) * item.qty), 0);
+
+        // INSERT KE DATABASE
+        const { data: order, error } = await db.from('orders').insert({
+            store_id: storeId,
+            order_number: "INV-" + Date.now().toString().slice(-6),
+            customer_name: currentTransaction.customer_name,
+            table_number: currentTransaction.table_number,
+            order_type: currentTransaction.order_type,
+            subtotal: currentTransaction.subtotal,
+            tax: currentTransaction.tax,
+            service: currentTransaction.service,
+            grand_total: currentTransaction.grand_total,
+            total_cost: totalCostOrder,
+            payment_method: methodToSave,
+            amount_received: finalPay,
+            change_amount: finalChange,
+            status: 'paid',
+            cashier_name: currentCashierName 
+        }).select().single();
+
+        if(error) throw new Error(error.message); // Lempar error database
+
+        // INSERT ITEMS
+        for(const item of currentTransaction.items) {
+            await db.from('order_items').insert({
+                order_id: order.id,
+                product_id: item.productId,
+                product_name: item.name,
+                qty: item.qty,
+                price_at_purchase: item.price,
+                subtotal: item.price * item.qty
+            });
+            
+            const {data:prod} = await db.from('products').select('stock').eq('id', item.productId).single();
+            if(prod) await db.from('products').update({stock: prod.stock - item.qty}).eq('id', item.productId);
+        }
+
+        // UPDATE SHIFT
+        if(currentMethod === 'cash') {
+            const { data: s } = await db.from('shifts').select('expected_cash').eq('id', shiftId).single();
+            await db.from('shifts').update({ expected_cash: s.expected_cash + currentTransaction.grand_total }).eq('id', shiftId);
+        }
+
+        // SUKSES: Tutup Modal & Render Struk
+        els.modalPay.style.display = 'none';
+        renderStruk(order);
+        els.modalStruk.style.display = 'flex';
+        
+        // RESET KERANJANG
+        cart = []; 
+        updateCartUI(); 
+        document.getElementById('cust-name').value = ""; 
+        document.getElementById('table-num').value = ""; 
+        document.getElementById('pay-input').value = ""; 
+
+    } catch (err) {
+        // JIKA ADA ERROR (Uang kurang / Database error)
+        alert("⚠️ Gagal: " + err.message);
+    } finally {
+        // 3. HIDUPKAN KEMBALI TOMBOL (Apapun yang terjadi, tombol harus nyala lagi untuk next order)
+        if (btnProses) {
+            btnProses.disabled = false;
+            btnProses.innerText = "PROSES";
+            btnProses.style.backgroundColor = ""; // Reset warna ke default CSS
+        }
+    }
 };
-
 function renderStruk(o) {
     const headerHtml = `
         <div style="border-bottom:1px dashed #000; padding-bottom:10px; margin-bottom:10px; text-align:center;">

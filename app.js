@@ -176,14 +176,18 @@ window.selectVariant = (idx) => {
 };
 
 // --- CART ---
+// --- UPDATE APP.JS: ADD TO CART ---
 function addToCart(p, variant) {
     const uniqueId = p.id + (variant ? '-' + variant.name : '');
     const price = p.price + (variant ? variant.price : 0);
     const name = p.name + (variant ? ` (${variant.name})` : '');
     
+    // Simpan cost_price (modal) ke cart. Jika varian, anggap modal varian 0 (atau bisa dikembangkan nanti)
+    const cost = p.cost_price || 0; 
+
     const exist = cart.find(c => c.uniqueId === uniqueId);
     if(exist) exist.qty++;
-    else cart.push({ uniqueId, productId: p.id, name, price, qty: 1 });
+    else cart.push({ uniqueId, productId: p.id, name, price, cost: cost, qty: 1 }); // Tambah field cost
     updateCartUI();
 }
 
@@ -302,8 +306,8 @@ window.fastCash = (amt) => {
     window.calcChange(document.getElementById('pay-input'));
 };
 
+// --- UPDATE APP.JS: PROCESS PAYMENT ---
 window.processFinalPayment = async () => {
-    // BERSIHKAN TITIK DULU SEBELUM PROSES
     const payVal = cleanNum(document.getElementById('pay-input').value);
     
     if(currentMethod === 'cash' && payVal < currentTransaction.grand_total) return alert("Uang Kurang!");
@@ -322,6 +326,9 @@ window.processFinalPayment = async () => {
     currentTransaction.amount_received = finalPay;
     currentTransaction.change_amount = finalChange;
 
+    // HITUNG TOTAL COST (MODAL) UNTUK ORDER INI
+    const totalCostOrder = cart.reduce((sum, item) => sum + (item.cost * item.qty), 0);
+
     const { data: order, error } = await db.from('orders').insert({
         store_id: storeId,
         order_number: "INV-" + Date.now().toString().slice(-6),
@@ -332,11 +339,12 @@ window.processFinalPayment = async () => {
         tax: currentTransaction.tax,
         service: currentTransaction.service,
         grand_total: currentTransaction.grand_total,
+        total_cost: totalCostOrder, // <--- SIMPAN TOTAL MODAL
         payment_method: methodToSave,
         amount_received: finalPay,
         change_amount: finalChange,
         status: 'paid',
-        cashier_name: currentCashierName // <--- (BARU) SIMPAN NAMA KASIR KE DB
+        cashier_name: currentCashierName 
     }).select().single();
 
     if(error) return alert(error.message);
@@ -364,7 +372,7 @@ window.processFinalPayment = async () => {
     renderStruk(order);
     els.modalStruk.style.display = 'flex';
     
-    // --- RESET OTOMATIS ---
+    // Reset
     cart = []; 
     updateCartUI(); 
     document.getElementById('cust-name').value = ""; 

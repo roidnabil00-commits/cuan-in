@@ -199,15 +199,21 @@
         <div id="menu-mgr" class="section">
             <h1>Kelola Menu</h1>
             <div class="panel">
-                <input type="hidden" id="menu-id">
+                <input type="hidden" id="menu-id"> 
+                
                 <div class="row">
                     <input type="text" id="nama" placeholder="Nama Menu" class="half">
-                    <input type="text" id="harga" placeholder="Harga" class="half" onkeyup="formatRupiah(this)">
+                    <div class="half" style="display:flex; gap:5px;">
+                        <input type="text" id="modal" placeholder="Modal (HPP)" onkeyup="formatRupiah(this)" style="flex:1;">
+                        <input type="text" id="harga" placeholder="Harga Jual" onkeyup="formatRupiah(this)" style="flex:1;">
+                    </div>
                 </div>
+
                 <div class="row">
                     <input type="number" id="stok" placeholder="Stok" class="half">
                     <input type="number" id="diskon" placeholder="Diskon (%)" class="half" min="0" max="100">
                 </div>
+
                 <select id="kategori">
                     <option value="Coffee">Coffee</option>
                     <option value="Non-Coffee">Non-Coffee</option>
@@ -226,6 +232,7 @@
                     <button id="btn-batal" style="background:#555; color:white; display:none;" onclick="resetForm()">BATAL</button>
                 </div>
             </div>
+
             <div class="panel">
                 <table>
                     <thead><tr><th>Produk</th><th>Varian</th><th>Harga</th><th>Stok</th><th>Aksi</th></tr></thead>
@@ -331,7 +338,7 @@
             // 3. Parse ke Integer (basis 10) agar pasti jadi angka bulat
             return parseInt(cleanString || 0, 10);
         };
-        
+
         // --- DASHBOARD ---
         function loadDashboard() {
             const today = new Date().toISOString().split('T')[0];
@@ -448,15 +455,19 @@
             });
         }
 
+        // --- UPDATE SCRIPT: EDIT & SIMPAN DENGAN MODAL ---
+
         window.editMenu = (d) => {
             document.getElementById('menu-id').value = d.id;
             document.getElementById('nama').value = d.name;
+            // Load Modal & Harga
+            document.getElementById('modal').value = new Intl.NumberFormat('id-ID').format(d.cost_price || 0);
             document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(d.price);
+            
             document.getElementById('stok').value = d.stock;
             document.getElementById('diskon').value = d.discount_percent || 0; 
             document.getElementById('kategori').value = d.category;
             
-            // Populate Varian
             if(d.variants) {
                 document.getElementById('varian-str').value = d.variants.map(v => `${v.name}:${v.price}`).join(', ');
             } else {
@@ -469,22 +480,18 @@
 
         window.resetForm = () => {
             document.getElementById('menu-id').value = ""; document.getElementById('nama').value = "";
-            document.getElementById('harga').value = ""; document.getElementById('stok').value = "";
+            document.getElementById('modal').value = ""; document.getElementById('harga').value = ""; // Reset Modal
+            document.getElementById('stok').value = "";
             document.getElementById('diskon').value = ""; document.getElementById('varian-str').value = ""; 
             document.getElementById('btn-simpan-menu').innerText = "SIMPAN MENU";
             document.getElementById('btn-batal').style.display = "none";
         };
 
-        window.delMenu = async (id) => { if(confirm("Hapus?")) { await db.from('products').delete().eq('id', id); loadMenu(); } };
-
         document.getElementById('btn-simpan-menu').addEventListener('click', async () => {
             const id = document.getElementById('menu-id').value;
-            
-            // AMBIL STORE ID DARI LOCALSTORAGE
             const currentStoreId = localStorage.getItem('store_id'); 
             if(!currentStoreId) return alert("Error: Session toko hilang. Silakan login ulang.");
 
-            // PARSE VARIAN
             const varianStr = document.getElementById('varian-str').value.trim();
             let variants = [];
             if(varianStr) {
@@ -497,11 +504,12 @@
             const p = {
                 store_id: currentStoreId,
                 name: document.getElementById('nama').value,
+                cost_price: cleanNum(document.getElementById('modal').value), // Simpan Modal
                 price: cleanNum(document.getElementById('harga').value),
                 stock: Number(document.getElementById('stok').value),
                 discount_percent: Number(document.getElementById('diskon').value),
                 category: document.getElementById('kategori').value,
-                variants: variants // <--- SIMPAN VARIAN KE DB
+                variants: variants
             };
 
             if(!p.name) return alert("Nama wajib!");

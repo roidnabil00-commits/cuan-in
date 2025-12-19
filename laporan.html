@@ -21,8 +21,8 @@
         #report-area { background: white; color: #333; padding: 40px; border-radius: 5px; min-height: 600px; max-width: 1100px; margin: 0 auto; box-shadow: 0 0 50px rgba(0,0,0,0.5); overflow-x: auto; }
         
         /* SUMMARY BOXES */
-        .summary-box { display: flex; gap: 15px; margin-bottom: 20px; }
-        .s-card { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd; }
+        .summary-box { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap:wrap; }
+        .s-card { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd; min-width: 150px; }
         .s-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
         .s-val { font-size: 20px; font-weight: bold; color: #333; margin-top: 5px; }
         
@@ -72,35 +72,35 @@
             <p id="period-display" style="margin:5px 0; color:#666;">Periode: -</p>
         </div>
 
-        <div class="summary-box" style="flex-wrap:wrap;">
-    <div class="s-card">
-        <div class="s-label">Total Penjualan (Omzet)</div>
-        <div class="s-val" id="tot-omzet" style="color:#28a745;">Rp 0</div>
-    </div>
-    <div class="s-card" style="border:1px solid #764ba2; background:#f3e5f5;">
-        <div class="s-label">💰 PROFIT BERSIH</div>
-        <div class="s-val" id="tot-profit" style="color:#764ba2;">Rp 0</div>
-    </div>
-    <div class="s-card">
-        <div class="s-label">Jumlah Transaksi</div>
-        <div class="s-val" id="tot-trx">0</div>
-    </div>
-</div>
+        <div class="summary-box">
+            <div class="s-card">
+                <div class="s-label">Total Penjualan (Omzet)</div>
+                <div class="s-val" id="tot-omzet" style="color:#28a745;">Rp 0</div>
+            </div>
+            <div class="s-card" style="border:1px solid #764ba2; background:#f3e5f5;">
+                <div class="s-label">💰 PROFIT BERSIH</div>
+                <div class="s-val" id="tot-profit" style="color:#764ba2;">Rp 0</div>
+            </div>
+            <div class="s-card">
+                <div class="s-label">Jumlah Transaksi</div>
+                <div class="s-val" id="tot-trx">0</div>
+            </div>
+        </div>
 
-<div class="summary-box">
-    <div class="s-card" style="background:#e8f5e9; border:1px solid #28a745;">
-        <div class="s-label">💵 CASH</div>
-        <div class="s-val" id="pay-cash">Rp 0</div>
-    </div>
-    <div class="s-card" style="background:#e3f2fd; border:1px solid #007bff;">
-        <div class="s-label">💳 EDC</div>
-        <div class="s-val" id="pay-edc">Rp 0</div>
-    </div>
-    <div class="s-card" style="background:#f3e5f5; border:1px solid #6f42c1;">
-        <div class="s-label">📱 QRIS</div>
-        <div class="s-val" id="pay-qris">Rp 0</div>
-    </div>
-</div>
+        <div class="summary-box">
+            <div class="s-card" style="background:#e8f5e9; border:1px solid #28a745;">
+                <div class="s-label">💵 CASH</div>
+                <div class="s-val" id="pay-cash">Rp 0</div>
+            </div>
+            <div class="s-card" style="background:#e3f2fd; border:1px solid #007bff;">
+                <div class="s-label">💳 EDC</div>
+                <div class="s-val" id="pay-edc">Rp 0</div>
+            </div>
+            <div class="s-card" style="background:#f3e5f5; border:1px solid #6f42c1;">
+                <div class="s-label">📱 QRIS</div>
+                <div class="s-val" id="pay-qris">Rp 0</div>
+            </div>
+        </div>
         
         <table>
             <thead>
@@ -125,7 +125,8 @@
         </div>
         
         <div style="margin-top:20px; font-size:10px; color:#666; font-style:italic;">
-            * Total Akhir = Subtotal - Diskon + Pajak + Service
+            * Total Akhir = Subtotal - Diskon + Pajak + Service <br>
+            * Profit = Total Akhir - Modal (HPP)
         </div>
         <div style="text-align:right; font-size:10px; color:#aaa; margin-top:10px;">Dicetak: <span id="print-date"></span></div>
     </div>
@@ -138,58 +139,60 @@
             if(data) document.getElementById('store-name').innerText = (data.store_name || "CUAN-IN") + " REPORT";
         });
 
-        // KUNCI PERBAIKAN: Kita butuh 2 variabel, Start (Mulai) dan End (Akhir)
+        // VARIABEL RENTANG WAKTU (Start & End)
         let currentStartDate = "";
-        let currentEndDate = ""; 
+        let currentEndDate = "";
         
         let currentPage = 1;
         const itemsPerPage = 20;
 
         window.setFilter = (type, btn) => {
+            // UI Button Active State
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
-            const now = new Date();
-            // Helper function biar format tanggal konsisten (YYYY-MM-DD)
-            const toISODate = (d) => d.toISOString().split('T')[0];
-            
+            const now = new Date(); // Waktu Lokal Komputer (WIB)
+            let start = new Date();
+            let end = new Date();
             let label = "";
 
+            // --- LOGIKA FILTER WAKTU LOKAL ---
             if(type === 'today') {
-                // Hari Ini: Dari jam 00:00 sampai jam 23:59 hari ini
-                currentStartDate = toISODate(now);
-                currentEndDate = toISODate(now) + "T23:59:59";
+                // Set Start: Hari ini jam 00:00:00 WIB
+                start.setHours(0,0,0,0);
+                // Set End: Hari ini jam 23:59:59 WIB
+                end.setHours(23,59,59,999);
                 label = "Hari Ini";
             } 
             else if(type === 'week') {
-                // Minggu Ini: Dari Senin sampai Detik ini
                 const day = now.getDay() || 7; 
-                const monday = new Date(now);
-                monday.setDate(now.getDate() - day + 1);
-                
-                currentStartDate = toISODate(monday);
-                currentEndDate = toISODate(now) + "T23:59:59";
+                start.setDate(now.getDate() - day + 1); // Senin
+                start.setHours(0,0,0,0);
+                end.setHours(23,59,59,999);
                 label = "Minggu Ini";
             } 
             else if(type === 'month') {
-                // Bulan Ini: Dari Tanggal 1 sampai Detik ini
-                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                
-                currentStartDate = toISODate(firstDay);
-                currentEndDate = toISODate(now) + "T23:59:59";
+                start = new Date(now.getFullYear(), now.getMonth(), 1); // Tanggal 1
+                start.setHours(0,0,0,0);
+                end.setHours(23,59,59,999);
                 label = "Bulan Ini";
             } 
             else if(type === 'custom') {
-                // Custom: HANYA HARI ITU SAJA (00:00 - 23:59)
                 const val = document.getElementById('custom-date').value;
-                if(!val) return; // Jangan jalan kalau kosong
+                if(!val) return; 
                 
-                currentStartDate = val;
-                currentEndDate = val + "T23:59:59"; // <--- INI SOLUSINYA BIAR GAK BOCOR KE HARI LAIN
+                // Parse YYYY-MM-DD secara aman ke Local Time
+                const [y, m, d] = val.split('-');
+                start = new Date(y, m-1, d, 0, 0, 0);
+                end = new Date(y, m-1, d, 23, 59, 59, 999);
                 label = "Tanggal: " + val;
             }
 
-            if(!currentStartDate) return;
+            // KONVERSI KE ISO STRING (UTC) UNTUK SUPABASE
+            // Ini akan otomatis menggeser jam sesuai selisih WIB ke UTC
+            currentStartDate = start.toISOString();
+            currentEndDate = end.toISOString();
+
             document.getElementById('period-display').innerText = label;
             document.getElementById('print-date').innerText = new Date().toLocaleString('id-ID');
 
@@ -203,12 +206,11 @@
             if(!currentStartDate || !currentEndDate) return;
             const searchTerm = document.getElementById('search-input').value.trim();
 
-            // 1. AMBIL SUMMARY (Omzet, Profit, Breakdown)
-            // PERBAIKAN QUERY: Gunakan .gte (Start) DAN .lte (End)
+            // 1. AMBIL SUMMARY (Menggunakan filter range gte & lte)
             let querySum = db.from('orders')
                 .select('grand_total, total_cost, payment_method, discount_amount')
                 .gte('created_at', currentStartDate)
-                .lte('created_at', currentEndDate); // <--- Filter batas atas
+                .lte('created_at', currentEndDate); 
             
             if(searchTerm) querySum = querySum.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
 
@@ -245,14 +247,14 @@
                 document.getElementById('pay-edc').innerText = "Rp " + edcTotal.toLocaleString('id-ID');
             }
 
-            // 2. AMBIL DATA TABEL (Pagination)
+            // 2. AMBIL DATA TABEL (Dengan Pagination & Filter Tanggal)
             const from = (currentPage - 1) * itemsPerPage;
             const to = from + itemsPerPage - 1;
 
             let queryTable = db.from('orders')
                 .select(`*, order_items(*)`)
                 .gte('created_at', currentStartDate)
-                .lte('created_at', currentEndDate) // <--- Filter batas atas juga disini
+                .lte('created_at', currentEndDate)
                 .order('created_at', {ascending:false})
                 .range(from, to);
 

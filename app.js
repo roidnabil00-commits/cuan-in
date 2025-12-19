@@ -427,3 +427,47 @@ function renderStruk(o) {
 
 // Start
 init();
+
+// ============================================================
+// 🔌 FITUR DETEKSI KONEKSI INTERNET (OFFLINE PROTECTION)
+// Paste kode ini di bagian paling bawah file app.js
+// ============================================================
+
+function checkConnectionStatus() {
+    const isOnline = navigator.onLine;
+    const btnCheckout = document.getElementById('btn-checkout');
+    const displayTotal = document.getElementById('btn-total');
+
+    if (!isOnline) {
+        // --- LOGIKA SAAT OFFLINE ---
+        // 1. Matikan tombol bayar
+        btnCheckout.disabled = true;
+        
+        // 2. Ubah tampilan visual agar kasir sadar
+        btnCheckout.style.backgroundColor = "#555"; // Jadi abu-abu
+        btnCheckout.style.color = "#aaa";
+        btnCheckout.style.cursor = "not-allowed";
+        
+        // 3. Beri peringatan teks
+        if (displayTotal) displayTotal.innerText = "🚫 OFFLINE";
+        
+    } else {
+        // --- LOGIKA SAAT ONLINE KEMBALI ---
+        // 1. Reset style ke default (mengikuti CSS)
+        btnCheckout.style.backgroundColor = ""; 
+        btnCheckout.style.color = "";
+        btnCheckout.style.cursor = "";
+
+        // 2. Panggil ulang fungsi updateCartUI() yang sudah ada di atas
+        // Ini penting agar tombol kembali enable/disable sesuai jumlah keranjang
+        // dan angka total harga kembali muncul.
+        updateCartUI(); 
+    }
+}
+
+// Pasang "Telinga" (Event Listener) untuk memantau koneksi
+window.addEventListener('online', checkConnectionStatus);
+window.addEventListener('offline', checkConnectionStatus);
+
+// Jalankan pengecekan sekali saat aplikasi baru dibuka
+checkConnectionStatus();

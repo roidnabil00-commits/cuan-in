@@ -314,9 +314,24 @@
         };
 
         // --- HELPER ---
-        window.formatRupiah = (el) => el.value = new Intl.NumberFormat('id-ID').format(el.value.replace(/\D/g, ''));
-        const cleanNum = (v) => Number(String(v).replace(/\./g,''));
+        // --- HELPER (UPDATED) ---
+        window.formatRupiah = (el) => {
+            // Hapus semua karakter non-digit agar format bersih
+            let val = el.value.replace(/\D/g, '');
+            // Format kembali jadi Rupiah visual (contoh: 10.000)
+            el.value = val ? new Intl.NumberFormat('id-ID').format(val) : '';
+        };
 
+        // FUNGSI PERBAIKAN: Pastikan data ke DB adalah Integer Murni
+        const cleanNum = (v) => {
+            if (!v) return 0;
+            // 1. Paksa ubah ke String
+            // 2. Regex /\D/g akan menghapus SEMUA huruf, titik, koma, simbol, spasi
+            const cleanString = String(v).replace(/\D/g, '');
+            // 3. Parse ke Integer (basis 10) agar pasti jadi angka bulat
+            return parseInt(cleanString || 0, 10);
+        };
+        
         // --- DASHBOARD ---
         function loadDashboard() {
             const today = new Date().toISOString().split('T')[0];

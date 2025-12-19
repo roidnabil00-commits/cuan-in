@@ -352,7 +352,15 @@ window.processFinalPayment = async () => {
     renderStruk(order);
     els.modalStruk.style.display = 'flex';
     cart = []; updateCartUI();
+    
+    // --- PERBAIKAN DI SINI (RESET OTOMATIS) ---
+    cart = []; 
+    updateCartUI(); // Kosongkan keranjang visual
+    document.getElementById('cust-name').value = ""; // Hapus Nama Pelanggan
+    document.getElementById('table-num').value = ""; // Hapus No Meja
+    document.getElementById('pay-input').value = ""; // Hapus Input Bayar
 };
+
 
 function renderStruk(o) {
     const headerHtml = `

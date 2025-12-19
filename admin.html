@@ -238,7 +238,7 @@
             <h1>Riwayat Transaksi</h1>
             <div class="panel">
                 <table>
-                    <thead><tr><th>Waktu</th><th>Order ID</th><th>Total</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Waktu</th><th>Order ID</th><th>Kasir</th><th>Total</th><th>Status</th></tr></thead>
                     <tbody id="tabel-transaksi"></tbody>
                 </table>
                 <div class="pagination">
@@ -503,7 +503,7 @@
             }
         });
 
-        // --- RIWAYAT ---
+        // --- RIWAYAT (UPDATE DENGAN NAMA KASIR) ---
         window.changeTrxPage = (delta) => { trxPage += delta; loadTrx(); };
 
         async function loadTrx() {
@@ -512,7 +512,7 @@
             const { data } = await db.from('orders').select('*').order('created_at', {ascending:false}).range(from, to);
             const tbody = document.getElementById('tabel-transaksi'); 
             tbody.innerHTML = "";
-            if(data) data.forEach(d => tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>Rp ${d.grand_total.toLocaleString()}</td><td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px; font-size:10px;">${d.status}</span></td></tr>`);
+            if(data) data.forEach(d => tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>${d.cashier_name || '-'}</td><td>Rp ${d.grand_total.toLocaleString()}</td><td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px; font-size:10px;">${d.status}</span></td></tr>`);
             document.getElementById('curr-page').innerText = trxPage;
             document.getElementById('prev-btn').disabled = trxPage === 1;
             document.getElementById('next-btn').disabled = !data || data.length < trxLimit;

@@ -3,6 +3,7 @@ import { db, auth } from './db-config.js';
 // --- STATE ---
 let storeId = localStorage.getItem('store_id');
 let shiftId = localStorage.getItem('shift_id');
+let currentCashierName = 'Kasir'; // <--- (BARU) Variabel simpan nama
 let cart = []; 
 let allProductsList = []; 
 let currentTransaction = {}; 
@@ -44,11 +45,20 @@ const cleanNum = (val) => Number(String(val).replace(/\./g,''));
 async function init() {
     if(!storeId) window.location.href = 'login.html';
     
+    // (BARU) AMBIL NAMA KASIR DARI DATABASE
+    const { data: { user } } = await auth.getUser();
+    if(user) {
+        const { data: profile } = await db.from('profiles').select('full_name').eq('id', user.id).single();
+        if(profile && profile.full_name) {
+            currentCashierName = profile.full_name;
+        }
+    }
+
     // 1. Cek Shift Aktif
     const { data: shift } = await db.from('shifts')
         .select('*')
         .eq('store_id', storeId)
-        .eq('user_id', (await auth.getUser()).data.user.id)
+        .eq('user_id', user.id)
         .eq('status', 'open')
         .single();
     
@@ -73,7 +83,8 @@ function showShiftModal(mode) {
     document.getElementById('shift-input').value = "";
     
     if(mode === 'open') {
-        document.getElementById('shift-title').innerText = "☀️ Buka Kasir";
+        // (BARU) Tampilkan sapaan nama kasir
+        document.getElementById('shift-title').innerText = `☀️ Halo, ${currentCashierName}!`;
         document.getElementById('shift-desc').innerText = "Masukkan modal awal (uang di laci)";
         document.getElementById('btn-shift-action').innerText = "BUKA KASIR";
         document.getElementById('btn-shift-action').onclick = () => openShift();
@@ -324,7 +335,8 @@ window.processFinalPayment = async () => {
         payment_method: methodToSave,
         amount_received: finalPay,
         change_amount: finalChange,
-        status: 'paid'
+        status: 'paid',
+        cashier_name: currentCashierName // <--- (BARU) SIMPAN NAMA KASIR KE DB
     }).select().single();
 
     if(error) return alert(error.message);
@@ -351,16 +363,14 @@ window.processFinalPayment = async () => {
     els.modalPay.style.display = 'none';
     renderStruk(order);
     els.modalStruk.style.display = 'flex';
-    cart = []; updateCartUI();
     
-    // --- PERBAIKAN DI SINI (RESET OTOMATIS) ---
+    // --- RESET OTOMATIS ---
     cart = []; 
-    updateCartUI(); // Kosongkan keranjang visual
-    document.getElementById('cust-name').value = ""; // Hapus Nama Pelanggan
-    document.getElementById('table-num').value = ""; // Hapus No Meja
-    document.getElementById('pay-input').value = ""; // Hapus Input Bayar
+    updateCartUI(); 
+    document.getElementById('cust-name').value = ""; 
+    document.getElementById('table-num').value = ""; 
+    document.getElementById('pay-input').value = ""; 
 };
-
 
 function renderStruk(o) {
     const headerHtml = `
@@ -372,7 +382,9 @@ function renderStruk(o) {
                 <span>NO: ${o.order_number}</span>
                 <span>${new Date().toLocaleTimeString()}</span>
             </div>
-            <div style="text-align:left; font-size:10px;">Pelanggan: ${o.customer_name}</div>
+            <div style="text-align:left; font-size:10px;">
+                <div>Pelanggan: ${o.customer_name}</div>
+                <div>Kasir: ${o.cashier_name || 'Staff'}</div> </div>
         </div>
     `;
 

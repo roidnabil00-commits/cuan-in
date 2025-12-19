@@ -138,7 +138,10 @@
             if(data) document.getElementById('store-name').innerText = (data.store_name || "CUAN-IN") + " REPORT";
         });
 
+        // KUNCI PERBAIKAN: Kita butuh 2 variabel, Start (Mulai) dan End (Akhir)
         let currentStartDate = "";
+        let currentEndDate = ""; 
+        
         let currentPage = 1;
         const itemsPerPage = 20;
 
@@ -146,22 +149,44 @@
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
-            const today = new Date();
+            const now = new Date();
+            // Helper function biar format tanggal konsisten (YYYY-MM-DD)
+            const toISODate = (d) => d.toISOString().split('T')[0];
+            
             let label = "";
 
             if(type === 'today') {
-                currentStartDate = today.toISOString().split('T')[0];
+                // Hari Ini: Dari jam 00:00 sampai jam 23:59 hari ini
+                currentStartDate = toISODate(now);
+                currentEndDate = toISODate(now) + "T23:59:59";
                 label = "Hari Ini";
-            } else if(type === 'week') {
-                const day = today.getDay() || 7; today.setDate(today.getDate() - day + 1);
-                currentStartDate = today.toISOString().split('T')[0];
+            } 
+            else if(type === 'week') {
+                // Minggu Ini: Dari Senin sampai Detik ini
+                const day = now.getDay() || 7; 
+                const monday = new Date(now);
+                monday.setDate(now.getDate() - day + 1);
+                
+                currentStartDate = toISODate(monday);
+                currentEndDate = toISODate(now) + "T23:59:59";
                 label = "Minggu Ini";
-            } else if(type === 'month') {
-                currentStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+            } 
+            else if(type === 'month') {
+                // Bulan Ini: Dari Tanggal 1 sampai Detik ini
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                
+                currentStartDate = toISODate(firstDay);
+                currentEndDate = toISODate(now) + "T23:59:59";
                 label = "Bulan Ini";
-            } else if(type === 'custom') {
-                currentStartDate = document.getElementById('custom-date').value;
-                label = "Tanggal: " + currentStartDate;
+            } 
+            else if(type === 'custom') {
+                // Custom: HANYA HARI ITU SAJA (00:00 - 23:59)
+                const val = document.getElementById('custom-date').value;
+                if(!val) return; // Jangan jalan kalau kosong
+                
+                currentStartDate = val;
+                currentEndDate = val + "T23:59:59"; // <--- INI SOLUSINYA BIAR GAK BOCOR KE HARI LAIN
+                label = "Tanggal: " + val;
             }
 
             if(!currentStartDate) return;
@@ -174,103 +199,107 @@
 
         window.handleSearch = (e) => { if (e.key === 'Enter') loadReportData(); }
 
-        // --- UPDATE SCRIPT: HITUNG PROFIT & BREAKDOWN ---
-window.loadReportData = async () => {
-    if(!currentStartDate) return;
-    const searchTerm = document.getElementById('search-input').value.trim();
+        window.loadReportData = async () => {
+            if(!currentStartDate || !currentEndDate) return;
+            const searchTerm = document.getElementById('search-input').value.trim();
 
-    // 1. AMBIL SUMMARY (Include total_cost untuk hitung profit)
-    let querySum = db.from('orders').select('grand_total, total_cost, payment_method, discount_amount').gte('created_at', currentStartDate);
-    
-    if(searchTerm) querySum = querySum.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
-
-    const { data: summaryData } = await querySum;
-    
-    if(summaryData) {
-        let totalOmzet = 0;
-        let totalProfit = 0;
-        let cashTotal = 0, qrisTotal = 0, edcTotal = 0;
-
-        summaryData.forEach(curr => {
-            const gTotal = curr.grand_total || 0;
-            const tCost = curr.total_cost || 0;
-            const method = (curr.payment_method || '').toUpperCase();
-
-            // Hitung Omzet & Profit
-            totalOmzet += gTotal;
-            totalProfit += (gTotal - tCost); // Profit = Jual - Modal
-
-            // Breakdown Payment
-            if(method.includes('CASH')) cashTotal += gTotal;
-            else if(method.includes('QRIS')) qrisTotal += gTotal;
-            else if(method.includes('EDC')) edcTotal += gTotal;
-        });
-        
-        // Render Summary
-        document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
-        document.getElementById('tot-profit').innerText = "Rp " + totalProfit.toLocaleString('id-ID'); // Render Profit
-        document.getElementById('tot-trx').innerText = summaryData.length;
-
-        // Render Breakdown
-        document.getElementById('pay-cash').innerText = "Rp " + cashTotal.toLocaleString('id-ID');
-        document.getElementById('pay-qris').innerText = "Rp " + qrisTotal.toLocaleString('id-ID');
-        document.getElementById('pay-edc').innerText = "Rp " + edcTotal.toLocaleString('id-ID');
-    }
-
-    // 2. AMBIL DATA TABEL (Sama seperti sebelumnya, cuma render ulang)
-    const from = (currentPage - 1) * itemsPerPage;
-    const to = from + itemsPerPage - 1;
-
-    let queryTable = db.from('orders')
-        .select(`*, order_items(*)`)
-        .gte('created_at', currentStartDate)
-        .order('created_at', {ascending:false})
-        .range(from, to);
-
-    if(searchTerm) queryTable = queryTable.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
-
-    const { data: tableData, error } = await queryTable;
-    const tbody = document.getElementById('tabel-laporan'); 
-    tbody.innerHTML = "";
-
-    if(error) return alert("Error: " + error.message);
-
-    if(tableData && tableData.length > 0) {
-        tableData.forEach(d => {
-            const dateObj = new Date(d.created_at);
-            const tanggal = dateObj.toLocaleDateString('id-ID'); 
-            const waktu = dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-            const itemsStr = d.order_items.map(i => `${i.product_name} (${i.qty})`).join("<br>");
+            // 1. AMBIL SUMMARY (Omzet, Profit, Breakdown)
+            // PERBAIKAN QUERY: Gunakan .gte (Start) DAN .lte (End)
+            let querySum = db.from('orders')
+                .select('grand_total, total_cost, payment_method, discount_amount')
+                .gte('created_at', currentStartDate)
+                .lte('created_at', currentEndDate); // <--- Filter batas atas
             
-            let methodClass = 'bg-cash';
-            if(d.payment_method && d.payment_method.toLowerCase().includes('qris')) methodClass = 'bg-qris';
-            if(d.payment_method && d.payment_method.toLowerCase().includes('edc')) methodClass = 'bg-edc';
+            if(searchTerm) querySum = querySum.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
 
-            const discAmt = d.discount_amount || 0;
+            const { data: summaryData } = await querySum;
+            
+            if(summaryData) {
+                let totalOmzet = 0;
+                let totalProfit = 0;
+                let cashTotal = 0, qrisTotal = 0, edcTotal = 0;
 
-            tbody.innerHTML += `
-                <tr>
-                    <td>${tanggal}<br><span style="color:#888;font-size:10px;">${waktu}</span></td>
-                    <td style="font-weight:bold; color:#555;">${d.order_number}</td>
-                    <td>${d.customer_name}</td>
-                    <td><span class="badge-pay ${methodClass}">${d.payment_method}</span></td>
-                    <td style="font-size:11px; color:#555;">${itemsStr}</td>
-                    <td style="text-align:right;">${d.subtotal.toLocaleString('id-ID')}</td>
-                    <td style="text-align:right; color:${discAmt>0 ? '#ff4757' : '#ccc'};">
-                        ${discAmt > 0 ? '-' + discAmt.toLocaleString('id-ID') : '0'}
-                    </td>
-                    <td style="text-align:right; font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td>
-                </tr>
-            `;
-        });
-    } else {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px;">Data tidak ditemukan</td></tr>`;
-    }
+                summaryData.forEach(curr => {
+                    const gTotal = curr.grand_total || 0;
+                    const tCost = curr.total_cost || 0;
+                    const method = (curr.payment_method || '').toUpperCase();
 
-    document.getElementById('curr-page').innerText = currentPage;
-    document.getElementById('prev-btn').disabled = currentPage === 1;
-    document.getElementById('next-btn').disabled = !tableData || tableData.length < itemsPerPage;
-};
+                    // Hitung Omzet & Profit
+                    totalOmzet += gTotal;
+                    totalProfit += (gTotal - tCost); 
+
+                    // Breakdown Payment
+                    if(method.includes('CASH')) cashTotal += gTotal;
+                    else if(method.includes('QRIS')) qrisTotal += gTotal;
+                    else if(method.includes('EDC')) edcTotal += gTotal;
+                });
+                
+                // Render Summary
+                document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
+                document.getElementById('tot-profit').innerText = "Rp " + totalProfit.toLocaleString('id-ID');
+                document.getElementById('tot-trx').innerText = summaryData.length;
+
+                // Render Breakdown
+                document.getElementById('pay-cash').innerText = "Rp " + cashTotal.toLocaleString('id-ID');
+                document.getElementById('pay-qris').innerText = "Rp " + qrisTotal.toLocaleString('id-ID');
+                document.getElementById('pay-edc').innerText = "Rp " + edcTotal.toLocaleString('id-ID');
+            }
+
+            // 2. AMBIL DATA TABEL (Pagination)
+            const from = (currentPage - 1) * itemsPerPage;
+            const to = from + itemsPerPage - 1;
+
+            let queryTable = db.from('orders')
+                .select(`*, order_items(*)`)
+                .gte('created_at', currentStartDate)
+                .lte('created_at', currentEndDate) // <--- Filter batas atas juga disini
+                .order('created_at', {ascending:false})
+                .range(from, to);
+
+            if(searchTerm) queryTable = queryTable.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
+
+            const { data: tableData, error } = await queryTable;
+            const tbody = document.getElementById('tabel-laporan'); 
+            tbody.innerHTML = "";
+
+            if(error) return alert("Error: " + error.message);
+
+            if(tableData && tableData.length > 0) {
+                tableData.forEach(d => {
+                    const dateObj = new Date(d.created_at);
+                    const tanggal = dateObj.toLocaleDateString('id-ID'); 
+                    const waktu = dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+                    const itemsStr = d.order_items.map(i => `${i.product_name} (${i.qty})`).join("<br>");
+                    
+                    let methodClass = 'bg-cash';
+                    if(d.payment_method && d.payment_method.toLowerCase().includes('qris')) methodClass = 'bg-qris';
+                    if(d.payment_method && d.payment_method.toLowerCase().includes('edc')) methodClass = 'bg-edc';
+
+                    const discAmt = d.discount_amount || 0;
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${tanggal}<br><span style="color:#888;font-size:10px;">${waktu}</span></td>
+                            <td style="font-weight:bold; color:#555;">${d.order_number}</td>
+                            <td>${d.customer_name}</td>
+                            <td><span class="badge-pay ${methodClass}">${d.payment_method}</span></td>
+                            <td style="font-size:11px; color:#555;">${itemsStr}</td>
+                            <td style="text-align:right;">${d.subtotal.toLocaleString('id-ID')}</td>
+                            <td style="text-align:right; color:${discAmt>0 ? '#ff4757' : '#ccc'};">
+                                ${discAmt > 0 ? '-' + discAmt.toLocaleString('id-ID') : '0'}
+                            </td>
+                            <td style="text-align:right; font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px;">Data tidak ditemukan</td></tr>`;
+            }
+
+            document.getElementById('curr-page').innerText = currentPage;
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = !tableData || tableData.length < itemsPerPage;
+        };
 
         window.changePage = (delta) => { currentPage += delta; loadReportData(); };
 
@@ -282,6 +311,7 @@ window.loadReportData = async () => {
             });
         };
 
+        // Default load hari ini
         setFilter('today', document.querySelector('.btn-filter'));
     </script>
 </body>

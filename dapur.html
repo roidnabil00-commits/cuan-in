@@ -50,14 +50,37 @@
     
     <audio id="notif-sound" src="orderan.mp3"></audio>
 
+    <div id="start-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column;">
+        <h1 style="color:#00ff88; margin-bottom:10px;">👨‍🍳 LAYAR DAPUR</h1>
+        <p style="color:#aaa; margin-bottom:30px;">Klik tombol di bawah agar notifikasi suara aktif</p>
+        <button onclick="startKitchen()" style="padding:15px 40px; font-size:20px; background:#00ff88; color:black; border:none; border-radius:50px; cursor:pointer; font-weight:bold; box-shadow: 0 0 20px rgba(0,255,136,0.5);">MULAI MONITOR 🔊</button>
+    </div>
+
     <div class="header">
         <h1>Dapur Monitor</h1>
         <div class="clock" id="clock">--:--</div>
     </div>
 
     <div id="kitchen-container">
-        <div style="text-align:center; color:#555; margin-top:50px;">Memuat data...</div>
+        <div style="text-align:center; color:#555; margin-top:50px;">Menunggu koneksi...</div>
     </div>
+
+    <script>
+        // FUNGSI GLOBAL UTK OVERLAY
+        function startKitchen() {
+            const overlay = document.getElementById('start-overlay');
+            const audio = document.getElementById('notif-sound');
+            
+            // Pancing audio play sekali (silent trigger)
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                overlay.style.display = 'none'; // Tutup overlay setelah berhasil
+            }).catch((err) => {
+                alert("Gagal mengaktifkan audio: " + err);
+            });
+        }
+    </script>
 
     <script type="module">
         import { db } from './db-config.js';
@@ -68,29 +91,42 @@
         }, 1000);
 
         let existingOrderIds = new Set();
+        let isFirstLoad = true; // Penanda penting agar load awal tidak bunyi berisik (kecuali diinginkan)
 
         // 2. FUNGSI UTAMA LOAD ORDERS
         async function loadOrders() {
             const { data: orders, error } = await db.from('orders')
                 .select(`*, order_items(*)`)
                 .eq('status', 'paid')
-                .order('created_at', { ascending: true }); // Yang lama di atas (FIFO)
+                .order('created_at', { ascending: true }); // FIFO (First In First Out)
             
             if(error) return console.error("Gagal load:", error);
             
             const container = document.getElementById('kitchen-container');
             
-            // Cek Pesanan Baru (Untuk Bunyi Ting!)
+            // --- LOGIKA NOTIFIKASI CERDAS ---
             const currentIds = new Set(orders.map(o => o.id));
+            
+            // Cek apakah ada order di list baru yang TIDAK ADA di list lama
             const isNewOrder = orders.some(o => !existingOrderIds.has(o.id));
             
-            if (isNewOrder && existingOrderIds.size > 0) {
-                // Play sound (perlu interaksi user minimal 1x sebelumnya)
-                document.getElementById('notif-sound').play().catch(() => {});
+            // Bunyi HANYA JIKA: Ada order baru DAN ini bukan load halaman pertama kali (saat refresh)
+            // TAPI: Jika user mau orderan masuk saat layar kosong juga bunyi, logika ini menghandlenya:
+            // Karena saat pertama buka (kosong), existingOrderIds kosong. 
+            // Jadi order masuk -> isNewOrder = True.
+            // Kita pakai !isFirstLoad agar saat REFRESH halaman yang isinya penuh, dia tidak bunyi semua.
+            
+            if (isNewOrder && !isFirstLoad) {
+                console.log("🔔 TING! Orderan baru masuk...");
+                playSound();
             }
-            existingOrderIds = currentIds;
 
-            // Render Ulang (Hanya jika jumlah berubah biar gak kedip-kedip parah, tapi untuk MVP kita render ulang aman)
+            // Update state lokal
+            existingOrderIds = currentIds;
+            isFirstLoad = false; // Matikan flag first load setelah eksekusi pertama
+            // ---------------------------------
+
+            // Render Ulang
             container.innerHTML = "";
             
             if (orders.length === 0) {
@@ -104,19 +140,23 @@
                 const diffMins = Math.floor(diffMs / 60000);
                 const isLate = diffMins > 15;
 
-                // Tampilan Kartu
+                // Badge Tipe Order
                 const badgeHtml = (data.order_type === 'takeaway' || !data.table_number) 
                     ? `<span class="badge badge-takeaway">TAKEAWAY</span>` 
                     : `<span class="badge badge-dinein">MEJA ${data.table_number}</span>`;
 
+                // List Menu
                 const itemsHtml = data.order_items.map(i => `
                     <li><span class="qty">${i.qty}x</span> <span>${i.product_name}</span></li>
                 `).join("");
 
                 const card = document.createElement('div');
                 card.className = 'ticket';
-                // Tambahkan class new-order jika baru muncul (opsional logic)
-                
+                // Efek visual order baru
+                if (isNewOrder && !existingOrderIds.has(data.id)) {
+                     card.classList.add('new-order');
+                }
+
                 card.innerHTML = `
                     <div class="ticket-header">
                         ${badgeHtml}
@@ -137,58 +177,48 @@
             });
         }
 
-        // 3. FUNGSI SELESAI MASAK (SAT-SET MODE)
+        // Helper Play Sound Aman
+        function playSound() {
+            const audio = document.getElementById('notif-sound');
+            if(audio) {
+                audio.currentTime = 0; 
+                audio.play().catch(e => console.warn("Audio diblokir browser, pastikan overlay sudah diklik.", e));
+            }
+        }
+
+        // 3. FUNGSI SELESAI MASAK
         window.selesaiMasak = async (id, btnElement) => {
-            // A. KONFIRMASI CEPAT
             if(!confirm("Yakin pesanan ini selesai?")) return;
 
-            // B. UI FIRST (Hapus duluan biar cepat)
+            // Efek UI Hapus Cepat
             const card = btnElement.closest('.ticket');
             if(card) {
                 card.style.transform = "scale(0.8)";
                 card.style.opacity = "0";
-                setTimeout(() => card.remove(), 300); // Hapus DOM setelah animasi
+                setTimeout(() => card.remove(), 300);
             }
 
-            // C. PROSES DATABASE DI BACKGROUND
+            // Update DB
             const { error } = await db.from('orders').update({ status: 'served' }).eq('id', id);
-            
             if(error) {
-                alert("Gagal update ke database! Cek koneksi atau izin RLS.");
-                console.error(error);
-                loadOrders(); // Kembalikan kartu jika gagal
+                alert("Gagal update DB!");
+                loadOrders(); // Balikin kartu kalau gagal
             }
         };
 
-        // 4. REALTIME LISTENER
+        // 4. REALTIME LISTENER (Agar otomatis update tanpa refresh)
         db.channel('kitchen-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-                loadOrders(); // Refresh kalau ada order baru/update dari kasir
+                console.log("Change received!", payload);
+                loadOrders();
             })
             .subscribe();
         
-        // Refresh timer tiap 1 menit
+        // Refresh timer tiap 1 menit (untuk update tulisan "x menit yang lalu")
         setInterval(loadOrders, 60000);
 
-        // First Load
+        // Load Pertama
         loadOrders();
     </script>
-    <div id="start-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column;">
-    <h2 style="color:white;">👨‍🍳 Layar Dapur</h2>
-    <button onclick="startKitchen()" style="padding:15px 30px; font-size:20px; background:#00ff88; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">MULAI MONITOR</button>
-</div>
-
-<script>
-    // Script sederhana untuk memastikan Audio Context jalan
-    function startKitchen() {
-        document.getElementById('start-overlay').style.display = 'none';
-        // Pancing audio play sekali (silent) agar browser mengizinkan sound berikutnya
-        const audio = document.getElementById('notif-sound');
-        audio.play().then(() => {
-            audio.pause();
-            audio.currentTime = 0;
-        }).catch(() => {});
-    }
-</script>
 </body>
 </html>

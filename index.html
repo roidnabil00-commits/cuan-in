@@ -56,6 +56,34 @@
             #cart-container.active { transform: translateY(0); }
             #mobile-cart-bar { display: flex; position: fixed; bottom: 20px; left: 5%; width: 90%; background: #16213e; padding: 15px; border-radius: 50px; justify-content: space-between; align-items: center; cursor: pointer; z-index: 200; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         }
+        @media print {
+    /* Sembunyikan semua elemen KECUALI modal struk */
+    body * {
+        visibility: hidden;
+    }
+    #modal-struk, #modal-struk * {
+        visibility: visible;
+    }
+    #modal-struk {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        background: white;
+        color: black;
+        overflow: visible;
+    }
+    /* Hapus margin default browser agar hemat kertas */
+    @page {
+        margin: 0; 
+        size: auto; 
+    }
+    /* Sembunyikan tombol print & tutup saat dicetak */
+    .modal-box button {
+        display: none !important;
+    }
+}
     </style>
 </head>
 <body>
@@ -191,5 +219,12 @@
             if(show) cart.classList.add('active'); else cart.classList.remove('active');
         }
     </script>
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js');
+    });
+  }
+</script>
 </body>
 </html>

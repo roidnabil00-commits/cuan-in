@@ -350,91 +350,87 @@ window.fastCash = (amt) => {
 // --- UPDATE APP.JS: PROCESS PAYMENT ---
 // --- UPDATE APP.JS: PROCESS PAYMENT (ANTI DOUBLE CLICK) ---
 window.processFinalPayment = async () => {
-    // 1. AMBIL TOMBOL & CEK APAKAH SEDANG LOADING
     const btnProses = document.getElementById('btn-process-pay');
-    if (btnProses && btnProses.disabled) return; // Stop jika tombol sedang dimatikan
+    if (btnProses && btnProses.disabled) return;
 
-    // 2. MATIKAN TOMBOL & UBAH TEKS JADI "LOADING..."
+    // UI Loading
     if (btnProses) {
         btnProses.disabled = true;
-        btnProses.innerText = "⏳ MEMPROSES...";
-        btnProses.style.backgroundColor = "#555"; // Ubah warna jadi abu biar kelihatan mati
+        btnProses.innerText = "⏳ MENGHITUNG DI SERVER...";
+        btnProses.style.backgroundColor = "#555";
     }
 
-    // --- LOGIKA ASLI MULAI DI SINI ---
     try {
-        // BERSIHKAN TITIK DULU SEBELUM PROSES
-        const payVal = cleanNum(document.getElementById('pay-input').value);
+        // 1. SIAPKAN DATA INPUT (Hanya data mentah, jangan kirim hasil hitungan!)
+        const rawAmountInput = cleanNum(document.getElementById('pay-input').value);
         
-        if(currentMethod === 'cash' && payVal < currentTransaction.grand_total) {
-            throw new Error("Uang Kurang!"); // Lempar ke catch di bawah
-        }
-
-        const finalPay = currentMethod === 'cash' ? payVal : currentTransaction.grand_total;
-        const finalChange = currentMethod === 'cash' ? (payVal - currentTransaction.grand_total) : 0;
-
         let methodToSave = currentMethod.toUpperCase();
         if(currentMethod === 'edc') {
             const bank = document.getElementById('edc-bank').value;
             const code = document.getElementById('edc-code').value;
             methodToSave = `EDC ${bank} (${code})`;
+        } else if (currentMethod === 'cash') {
+            methodToSave = 'TUNAI'; // Standarisasi string untuk SQL
+        } else if (currentMethod === 'qris') {
+            methodToSave = 'QRIS';
         }
 
-        currentTransaction.payment_method = methodToSave;
-        currentTransaction.amount_received = finalPay;
-        currentTransaction.change_amount = finalChange;
+        // 2. FORMAT ITEM UNTUK DIKIRIM KE SQL (Perhatikan 'variant_name')
+        // Kita perlu extract nama varian murni dari cart item name
+        // Cart name format di app.js lama: "Kopi (Es)" -> kita butuh "Es"
+        const cleanItems = cart.map(item => {
+            let varName = null;
+            // Cek logic cart kamu: UniqueId = "12-Es" atau nama = "Kopi (Es)"
+            // Kita coba ambil dari UniqueId atau parsing nama
+            // Paling aman: kita parsing nama yang ada kurungnya
+            const match = item.name.match(/\(([^)]+)\)$/);
+            if (match) varName = match[1]; // Ambil text dalam kurung sebagai varian
 
-        // HITUNG TOTAL COST (MODAL)
-        const totalCostOrder = cart.reduce((sum, item) => sum + ((item.cost || 0) * item.qty), 0);
-
-        // INSERT KE DATABASE
-        const { data: order, error } = await db.from('orders').insert({
-            store_id: storeId,
-            order_number: "INV-" + Date.now().toString().slice(-6),
-            customer_name: currentTransaction.customer_name,
-            table_number: currentTransaction.table_number,
-            order_type: currentTransaction.order_type,
-            subtotal: currentTransaction.subtotal,
-            tax: currentTransaction.tax,
-            service: currentTransaction.service,
-            grand_total: currentTransaction.grand_total,
-            total_cost: totalCostOrder,
-            payment_method: methodToSave,
-            amount_received: finalPay,
-            change_amount: finalChange,
-            status: 'paid',
-            cashier_name: currentCashierName 
-        }).select().single();
-
-        if(error) throw new Error(error.message); // Lempar error database
-
-        // INSERT ITEMS
-        for(const item of currentTransaction.items) {
-            await db.from('order_items').insert({
-                order_id: order.id,
+            return {
                 product_id: item.productId,
-                product_name: item.name,
                 qty: item.qty,
-                price_at_purchase: item.price,
-                subtotal: item.price * item.qty
-            });
-            
-            const {data:prod} = await db.from('products').select('stock').eq('id', item.productId).single();
-            if(prod) await db.from('products').update({stock: prod.stock - item.qty}).eq('id', item.productId);
-        }
+                variant_name: varName // Kirim nama varian, biarkan DB cari harganya
+            };
+        });
 
-        // UPDATE SHIFT
-        if(currentMethod === 'cash') {
-            const { data: s } = await db.from('shifts').select('expected_cash').eq('id', shiftId).single();
-            await db.from('shifts').update({ expected_cash: s.expected_cash + currentTransaction.grand_total }).eq('id', shiftId);
-        }
+        // 3. PANGGIL FUNGSI SERVER (RPC)
+        const payload = {
+            p_store_id: storeId,
+            p_cashier_name: currentCashierName,
+            p_shift_id: shiftId,
+            p_customer_name: currentTransaction.customer_name,
+            p_table_number: currentTransaction.table_number,
+            p_order_type: currentTransaction.order_type,
+            p_payment_method: methodToSave,
+            p_amount_received: rawAmountInput || 0,
+            p_items: cleanItems
+        };
 
-        // SUKSES: Tutup Modal & Render Struk
+        const { data: resultStruk, error } = await db.rpc('process_transaction_secure', payload);
+
+        if (error) throw new Error(error.message); // Error stok/uang kurang akan muncul disini
+
+        // 4. SUKSES! UPDATE UI DENGAN HASIL DARI SERVER
+        // Kita perlu menyusun objek 'order' agar fungsi renderStruk(order) tetap jalan
+        // Karena RPC cuma return sedikit data, kita gabungkan manual untuk tampilan struk
+        const orderForStruk = {
+            order_number: resultStruk.order_number,
+            customer_name: currentTransaction.customer_name,
+            cashier_name: currentCashierName,
+            subtotal: currentTransaction.subtotal, // Visual sementara (karena DB sudah hitung ulang)
+            tax: currentTransaction.tax,           // Visual sementara
+            service: currentTransaction.service,   // Visual sementara
+            grand_total: resultStruk.grand_total,  // PENTING: Ini dari server
+            payment_method: methodToSave,
+            amount_received: rawAmountInput || resultStruk.grand_total,
+            change_amount: resultStruk.change_amount // PENTING: Ini dari server
+        };
+
         els.modalPay.style.display = 'none';
-        renderStruk(order);
+        renderStruk(orderForStruk); // Panggil fungsi render struk lama
         els.modalStruk.style.display = 'flex';
         
-        // RESET KERANJANG
+        // Reset
         cart = []; 
         updateCartUI(); 
         document.getElementById('cust-name').value = ""; 
@@ -442,14 +438,13 @@ window.processFinalPayment = async () => {
         document.getElementById('pay-input').value = ""; 
 
     } catch (err) {
-        // JIKA ADA ERROR (Uang kurang / Database error)
-        alert("⚠️ Gagal: " + err.message);
+        alert("⚠️ Transaksi Gagal: " + err.message);
+        console.error(err);
     } finally {
-        // 3. HIDUPKAN KEMBALI TOMBOL (Apapun yang terjadi, tombol harus nyala lagi untuk next order)
         if (btnProses) {
             btnProses.disabled = false;
             btnProses.innerText = "PROSES";
-            btnProses.style.backgroundColor = ""; // Reset warna ke default CSS
+            btnProses.style.backgroundColor = ""; 
         }
     }
 };

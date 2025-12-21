@@ -80,14 +80,17 @@
             <div class="s-card">
                 <div class="s-label">Total Penjualan (Omzet)</div>
                 <div class="s-val" id="tot-omzet" style="color:#28a745;">Rp 0</div>
+                <small style="font-size:9px; color:#888;">(Termasuk Tax & Service)</small>
             </div>
             <div class="s-card" style="border:1px solid #17a2b8; background:#e0f7fa;">
                 <div class="s-label">Penjualan Bersih (Net)</div>
                 <div class="s-val" id="tot-net" style="color:#17a2b8;">Rp 0</div>
+                <small style="font-size:9px; color:#666;">(Subtotal Murni)</small>
             </div>
             <div class="s-card" style="border:1px solid #764ba2; background:#f3e5f5;">
                 <div class="s-label">💰 PROFIT BERSIH</div>
                 <div class="s-val" id="tot-profit" style="color:#764ba2;">Rp 0</div>
+                <small style="font-size:9px; color:#666;">(Net Sales - Modal)</small>
             </div>
             <div class="s-card">
                 <div class="s-label">Jumlah Transaksi</div>
@@ -97,15 +100,15 @@
 
         <div class="summary-box">
             <div class="s-card" style="background:#e8f5e9; border:1px solid #28a745;">
-                <div class="s-label">💵 CASH</div>
+                <div class="s-label">💵 CASH (LACI)</div>
                 <div class="s-val" id="pay-cash">Rp 0</div>
             </div>
             <div class="s-card" style="background:#e3f2fd; border:1px solid #007bff;">
-                <div class="s-label">💳 EDC</div>
+                <div class="s-label">💳 EDC (BANK)</div>
                 <div class="s-val" id="pay-edc">Rp 0</div>
             </div>
             <div class="s-card" style="background:#f3e5f5; border:1px solid #6f42c1;">
-                <div class="s-label">📱 QRIS</div>
+                <div class="s-label">📱 QRIS (BANK)</div>
                 <div class="s-val" id="pay-qris">Rp 0</div>
             </div>
         </div>
@@ -121,7 +124,8 @@
                     <th style="text-align:right;">Subtotal</th>
                     <th style="text-align:right;">Diskon</th>
                     <th style="text-align:right;">Total Akhir</th>
-                    <th style="text-align:center; width:50px;" data-html2canvas-ignore="true">Aksi</th> </tr>
+                    <th style="text-align:center; width:50px;" data-html2canvas-ignore="true">Aksi</th>
+                </tr>
             </thead>
             <tbody id="tabel-laporan"></tbody>
         </table>
@@ -133,9 +137,9 @@
         </div>
         
         <div style="margin-top:20px; font-size:10px; color:#666; font-style:italic;">
-            * Net Sales (Subtotal) = Omzet - Tax - Service<br>
-            * Profit = Total Akhir (Omzet) - Modal (HPP)<br>
-            * Void Transaksi akan mengembalikan stok produk otomatis.
+            * Omzet = Subtotal + Pajak + Service - Diskon<br>
+            * Net Sales (Subtotal) = Penjualan Murni Barang<br>
+            * Profit = Net Sales (Subtotal) - Modal (HPP)<br>
         </div>
         <div style="text-align:right; font-size:10px; color:#aaa; margin-top:10px;">Dicetak: <span id="print-date"></span></div>
     </div>
@@ -159,12 +163,12 @@
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
-            const now = new Date(); // Waktu Lokal Komputer (WIB)
+            const now = new Date(); 
             let start = new Date();
             let end = new Date();
             let label = "";
 
-            // --- LOGIKA FILTER WAKTU LOKAL ---
+            // --- LOGIKA FILTER WAKTU LOKAL (WIB) ---
             if(type === 'today') {
                 start.setHours(0,0,0,0);
                 end.setHours(23,59,59,999);
@@ -172,13 +176,13 @@
             } 
             else if(type === 'week') {
                 const day = now.getDay() || 7; 
-                start.setDate(now.getDate() - day + 1); // Senin
+                start.setDate(now.getDate() - day + 1); 
                 start.setHours(0,0,0,0);
                 end.setHours(23,59,59,999);
                 label = "Minggu Ini";
             } 
             else if(type === 'month') {
-                start = new Date(now.getFullYear(), now.getMonth(), 1); // Tanggal 1
+                start = new Date(now.getFullYear(), now.getMonth(), 1); 
                 start.setHours(0,0,0,0);
                 end.setHours(23,59,59,999);
                 label = "Bulan Ini";
@@ -232,20 +236,28 @@
                     const tCost = curr.total_cost || 0;
                     const method = (curr.payment_method || '').toUpperCase();
 
-                    totalOmzet += gTotal;
-                    totalNet += subTotal; 
-                    totalProfit += (gTotal - tCost); 
+                    // --- PERBAIKAN LOGIKA SESUAI REQUEST ---
+                    totalOmzet += gTotal;         // 1. Omzet = Total Transaksi (Termasuk Tax/Service)
+                    totalNet += subTotal;         // 2. Net = Subtotal (Tanpa Tax/Service)
+                    
+                    // 3. PROFIT = Net Sales (Subtotal) - HPP (tCost)
+                    // DULU SALAH: (gTotal - tCost)
+                    // SEKARANG BENAR: (subTotal - tCost)
+                    totalProfit += (subTotal - tCost); 
 
+                    // 4, 5, 6 Breakdown Pembayaran
                     if(method.includes('CASH')) cashTotal += gTotal;
                     else if(method.includes('QRIS')) qrisTotal += gTotal;
                     else if(method.includes('EDC')) edcTotal += gTotal;
                 });
                 
+                // Render Summary
                 document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
                 document.getElementById('tot-net').innerText = "Rp " + totalNet.toLocaleString('id-ID');
                 document.getElementById('tot-profit').innerText = "Rp " + totalProfit.toLocaleString('id-ID');
                 document.getElementById('tot-trx').innerText = summaryData.length;
 
+                // Render Breakdown
                 document.getElementById('pay-cash').innerText = "Rp " + cashTotal.toLocaleString('id-ID');
                 document.getElementById('pay-qris').innerText = "Rp " + qrisTotal.toLocaleString('id-ID');
                 document.getElementById('pay-edc').innerText = "Rp " + edcTotal.toLocaleString('id-ID');
@@ -283,7 +295,6 @@
 
                     const discAmt = d.discount_amount || 0;
 
-                    // TAMBAHAN: Tombol Void di kolom terakhir
                     tbody.innerHTML += `
                         <tr>
                             <td>${tanggal}<br><span style="color:#888;font-size:10px;">${waktu}</span></td>
@@ -321,32 +332,24 @@
             });
         };
 
-        // --- FITUR BARU: VOID TRANSAKSI & KEMBALIKAN STOK ---
         window.voidTransaction = async (orderId) => {
             if(!confirm("⚠️ PERINGATAN: Anda yakin ingin MENGHAPUS transaksi ini?\n\n- Data akan hilang permanen dari laporan.\n- Stok barang akan DIKEMBALIKAN otomatis.")) return;
 
             try {
-                // 1. Ambil detail item yang dibeli untuk dikembalikan stoknya
                 const { data: items, error: errItems } = await db.from('order_items').select('*').eq('order_id', orderId);
                 if(errItems) throw errItems;
 
-                // 2. Loop setiap item dan kembalikan stok ke tabel products
                 for(let item of items) {
-                    // Ambil stok sekarang dulu agar aman
                     const { data: prod } = await db.from('products').select('stock').eq('id', item.product_id).single();
                     if(prod) {
-                        // Update stok = stok lama + qty yang divoid
                         await db.from('products').update({ stock: prod.stock + item.qty }).eq('id', item.product_id);
                     }
                 }
 
-                // 3. Hapus data Order (Cascade akan menghapus order_items juga jika settingan DB benar, tapi kita sudah ambil datanya tadi)
                 const { error: errDel } = await db.from('orders').delete().eq('id', orderId);
                 if(errDel) throw errDel;
 
                 alert("✅ Transaksi berhasil dihapus! Stok telah dikembalikan.");
-                
-                // 4. Refresh Data Laporan
                 loadReportData();
 
             } catch (err) {

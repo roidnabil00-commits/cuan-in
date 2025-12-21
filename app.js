@@ -17,6 +17,14 @@ let storeConfig = {
     service_rate: 0 
 };
 let selectedProductForVariant = null;
+// Helper Anti-XSS (Taruh di paling atas app.js)
+const escapeHtml = (unsafe) => {
+    return (unsafe || "").replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+};
 
 // --- DOM ELEMENTS ---
 const els = {
@@ -459,9 +467,8 @@ function renderStruk(o) {
                 <span>${new Date().toLocaleTimeString()}</span>
             </div>
             <div style="text-align:left; font-size:10px;">
-                <div>Pelanggan: ${o.customer_name}</div>
-                <div>Kasir: ${o.cashier_name || 'Staff'}</div> </div>
-        </div>
+        <div>Pelanggan: ${escapeHtml(o.customer_name)}</div> <div>Kasir: ${escapeHtml(o.cashier_name || 'Staff')}</div> 
+    </div>
     `;
 
     let itemsHtml = '';

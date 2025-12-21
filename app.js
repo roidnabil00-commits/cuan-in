@@ -145,10 +145,18 @@ window.filterMenu = (cat, btn) => {
     
     list.forEach(p => {
         const hasVar = p.variants && p.variants.length > 0;
+        
+        // --- LOGIKA TAMPILAN STOK ---
+        const isHabis = p.stock <= 0;
+        const cardStyle = isHabis ? "opacity:0.6; background:#2a0f0f; border:1px solid red; cursor:not-allowed;" : "";
+        const clickEvent = isHabis ? "alert('Stok Habis!')" : `handleClickProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})`; // Escape quote aman
+        const labelHabis = isHabis ? "<div style='color:red; font-weight:bold; font-size:12px; margin-bottom:5px;'>❌ HABIS</div>" : "";
+        
         els.menu.innerHTML += `
-            <div class="card" onclick='handleClickProduct(${JSON.stringify(p)})'>
+            <div class="card" style="${cardStyle}" onclick="${clickEvent}">
+                ${labelHabis}
                 <h3>${p.name} ${hasVar ? '<span style="font-size:10px; background:#764ba2; padding:2px 5px; border-radius:4px;">Varian</span>' : ''}</h3>
-                <div class="price">Rp ${p.price.toLocaleString()}</div>
+                <div class="price">Rp ${p.price.toLocaleString()} <span style="font-size:10px; color:#aaa;">(Stok: ${p.stock})</span></div>
             </div>`;
     });
 }
@@ -175,25 +183,58 @@ window.selectVariant = (idx) => {
     els.modalVar.style.display = 'none';
 };
 
-// --- CART ---
-// --- UPDATE APP.JS: ADD TO CART ---
 function addToCart(p, variant) {
+    // 1. CEK STOK DASAR
+    if (p.stock <= 0) {
+        return alert("❌ Stok Habis! Tidak bisa dipilih.");
+    }
+
     const uniqueId = p.id + (variant ? '-' + variant.name : '');
+    
+    // 2. HITUNG TOTAL ITEM INI YANG SUDAH ADA DI KERANJANG
+    // Kita harus filter berdasarkan productId karena varian beda tetap mengurangi stok produk yang sama
+    const totalQtyInCart = cart
+        .filter(item => item.productId === p.id)
+        .reduce((sum, item) => sum + item.qty, 0);
+
+    // 3. CEK APAKAH JIKA DITAMBAH 1 MASIH CUKUP?
+    if (totalQtyInCart + 1 > p.stock) {
+        return alert(`⚠️ Stok tidak cukup! Sisa stok fisik hanya: ${p.stock}`);
+    }
+
+    // --- LOGIC LAMA (BAWAH) TETAP SAMA ---
     const price = p.price + (variant ? variant.price : 0);
     const name = p.name + (variant ? ` (${variant.name})` : '');
-    
-    // Simpan cost_price (modal) ke cart. Jika varian, anggap modal varian 0 (atau bisa dikembangkan nanti)
     const cost = p.cost_price || 0; 
 
     const exist = cart.find(c => c.uniqueId === uniqueId);
     if(exist) exist.qty++;
-    else cart.push({ uniqueId, productId: p.id, name, price, cost: cost, qty: 1 }); // Tambah field cost
+    else cart.push({ uniqueId, productId: p.id, name, price, cost: cost, qty: 1 });
+    
     updateCartUI();
 }
 
 window.changeQty = (uid, delta) => {
     const item = cart.find(c => c.uniqueId === uid);
     if(!item) return;
+
+    // JIKA MENAMBAH (+), CEK STOK DULU
+    if (delta > 0) {
+        // Ambil data produk asli dari list global (allProductsList)
+        const productAsli = allProductsList.find(p => p.id === item.productId);
+        
+        if (productAsli) {
+            // Hitung total qty produk ini di keranjang saat ini
+            const totalQtyInCart = cart
+                .filter(c => c.productId === item.productId)
+                .reduce((sum, i) => sum + i.qty, 0);
+
+            if (totalQtyInCart + 1 > productAsli.stock) {
+                return alert(`⚠️ Mentok! Stok sisa ${productAsli.stock}`);
+            }
+        }
+    }
+
     item.qty += delta;
     if(item.qty <= 0) cart = cart.filter(c => c.uniqueId !== uid);
     updateCartUI();

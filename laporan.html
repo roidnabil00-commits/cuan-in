@@ -41,6 +41,10 @@
         .pagination { display: flex; justify-content: center; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px dashed #ccc; }
         .btn-page { padding: 8px 15px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; }
         .btn-page:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* BUTTON VOID */
+        .btn-void { background: #ff4757; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; transition: 0.2s; }
+        .btn-void:hover { background: #d63031; transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -76,6 +80,10 @@
             <div class="s-card">
                 <div class="s-label">Total Penjualan (Omzet)</div>
                 <div class="s-val" id="tot-omzet" style="color:#28a745;">Rp 0</div>
+            </div>
+            <div class="s-card" style="border:1px solid #17a2b8; background:#e0f7fa;">
+                <div class="s-label">Penjualan Bersih (Net)</div>
+                <div class="s-val" id="tot-net" style="color:#17a2b8;">Rp 0</div>
             </div>
             <div class="s-card" style="border:1px solid #764ba2; background:#f3e5f5;">
                 <div class="s-label">💰 PROFIT BERSIH</div>
@@ -113,7 +121,7 @@
                     <th style="text-align:right;">Subtotal</th>
                     <th style="text-align:right;">Diskon</th>
                     <th style="text-align:right;">Total Akhir</th>
-                </tr>
+                    <th style="text-align:center; width:50px;" data-html2canvas-ignore="true">Aksi</th> </tr>
             </thead>
             <tbody id="tabel-laporan"></tbody>
         </table>
@@ -125,8 +133,9 @@
         </div>
         
         <div style="margin-top:20px; font-size:10px; color:#666; font-style:italic;">
-            * Total Akhir = Subtotal - Diskon + Pajak + Service <br>
-            * Profit = Total Akhir - Modal (HPP)
+            * Net Sales (Subtotal) = Omzet - Tax - Service<br>
+            * Profit = Total Akhir (Omzet) - Modal (HPP)<br>
+            * Void Transaksi akan mengembalikan stok produk otomatis.
         </div>
         <div style="text-align:right; font-size:10px; color:#aaa; margin-top:10px;">Dicetak: <span id="print-date"></span></div>
     </div>
@@ -147,7 +156,6 @@
         const itemsPerPage = 20;
 
         window.setFilter = (type, btn) => {
-            // UI Button Active State
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
@@ -158,9 +166,7 @@
 
             // --- LOGIKA FILTER WAKTU LOKAL ---
             if(type === 'today') {
-                // Set Start: Hari ini jam 00:00:00 WIB
                 start.setHours(0,0,0,0);
-                // Set End: Hari ini jam 23:59:59 WIB
                 end.setHours(23,59,59,999);
                 label = "Hari Ini";
             } 
@@ -181,7 +187,6 @@
                 const val = document.getElementById('custom-date').value;
                 if(!val) return; 
                 
-                // Parse YYYY-MM-DD secara aman ke Local Time
                 const [y, m, d] = val.split('-');
                 start = new Date(y, m-1, d, 0, 0, 0);
                 end = new Date(y, m-1, d, 23, 59, 59, 999);
@@ -189,7 +194,6 @@
             }
 
             // KONVERSI KE ISO STRING (UTC) UNTUK SUPABASE
-            // Ini akan otomatis menggeser jam sesuai selisih WIB ke UTC
             currentStartDate = start.toISOString();
             currentEndDate = end.toISOString();
 
@@ -206,9 +210,9 @@
             if(!currentStartDate || !currentEndDate) return;
             const searchTerm = document.getElementById('search-input').value.trim();
 
-            // 1. AMBIL SUMMARY (Menggunakan filter range gte & lte)
+            // 1. AMBIL SUMMARY
             let querySum = db.from('orders')
-                .select('grand_total, total_cost, payment_method, discount_amount')
+                .select('grand_total, subtotal, total_cost, payment_method, discount_amount')
                 .gte('created_at', currentStartDate)
                 .lte('created_at', currentEndDate); 
             
@@ -218,36 +222,36 @@
             
             if(summaryData) {
                 let totalOmzet = 0;
+                let totalNet = 0;
                 let totalProfit = 0;
                 let cashTotal = 0, qrisTotal = 0, edcTotal = 0;
 
                 summaryData.forEach(curr => {
                     const gTotal = curr.grand_total || 0;
+                    const subTotal = curr.subtotal || 0;
                     const tCost = curr.total_cost || 0;
                     const method = (curr.payment_method || '').toUpperCase();
 
-                    // Hitung Omzet & Profit
                     totalOmzet += gTotal;
+                    totalNet += subTotal; 
                     totalProfit += (gTotal - tCost); 
 
-                    // Breakdown Payment
                     if(method.includes('CASH')) cashTotal += gTotal;
                     else if(method.includes('QRIS')) qrisTotal += gTotal;
                     else if(method.includes('EDC')) edcTotal += gTotal;
                 });
                 
-                // Render Summary
                 document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
+                document.getElementById('tot-net').innerText = "Rp " + totalNet.toLocaleString('id-ID');
                 document.getElementById('tot-profit').innerText = "Rp " + totalProfit.toLocaleString('id-ID');
                 document.getElementById('tot-trx').innerText = summaryData.length;
 
-                // Render Breakdown
                 document.getElementById('pay-cash').innerText = "Rp " + cashTotal.toLocaleString('id-ID');
                 document.getElementById('pay-qris').innerText = "Rp " + qrisTotal.toLocaleString('id-ID');
                 document.getElementById('pay-edc').innerText = "Rp " + edcTotal.toLocaleString('id-ID');
             }
 
-            // 2. AMBIL DATA TABEL (Dengan Pagination & Filter Tanggal)
+            // 2. AMBIL DATA TABEL
             const from = (currentPage - 1) * itemsPerPage;
             const to = from + itemsPerPage - 1;
 
@@ -279,6 +283,7 @@
 
                     const discAmt = d.discount_amount || 0;
 
+                    // TAMBAHAN: Tombol Void di kolom terakhir
                     tbody.innerHTML += `
                         <tr>
                             <td>${tanggal}<br><span style="color:#888;font-size:10px;">${waktu}</span></td>
@@ -291,11 +296,14 @@
                                 ${discAmt > 0 ? '-' + discAmt.toLocaleString('id-ID') : '0'}
                             </td>
                             <td style="text-align:right; font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td>
+                            <td style="text-align:center;" data-html2canvas-ignore="true">
+                                <button class="btn-void" onclick="voidTransaction(${d.id})" title="Hapus Transaksi">🗑️</button>
+                            </td>
                         </tr>
                     `;
                 });
             } else {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px;">Data tidak ditemukan</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px;">Data tidak ditemukan</td></tr>`;
             }
 
             document.getElementById('curr-page').innerText = currentPage;
@@ -313,7 +321,40 @@
             });
         };
 
-        // Default load hari ini
+        // --- FITUR BARU: VOID TRANSAKSI & KEMBALIKAN STOK ---
+        window.voidTransaction = async (orderId) => {
+            if(!confirm("⚠️ PERINGATAN: Anda yakin ingin MENGHAPUS transaksi ini?\n\n- Data akan hilang permanen dari laporan.\n- Stok barang akan DIKEMBALIKAN otomatis.")) return;
+
+            try {
+                // 1. Ambil detail item yang dibeli untuk dikembalikan stoknya
+                const { data: items, error: errItems } = await db.from('order_items').select('*').eq('order_id', orderId);
+                if(errItems) throw errItems;
+
+                // 2. Loop setiap item dan kembalikan stok ke tabel products
+                for(let item of items) {
+                    // Ambil stok sekarang dulu agar aman
+                    const { data: prod } = await db.from('products').select('stock').eq('id', item.product_id).single();
+                    if(prod) {
+                        // Update stok = stok lama + qty yang divoid
+                        await db.from('products').update({ stock: prod.stock + item.qty }).eq('id', item.product_id);
+                    }
+                }
+
+                // 3. Hapus data Order (Cascade akan menghapus order_items juga jika settingan DB benar, tapi kita sudah ambil datanya tadi)
+                const { error: errDel } = await db.from('orders').delete().eq('id', orderId);
+                if(errDel) throw errDel;
+
+                alert("✅ Transaksi berhasil dihapus! Stok telah dikembalikan.");
+                
+                // 4. Refresh Data Laporan
+                loadReportData();
+
+            } catch (err) {
+                alert("❌ Gagal menghapus transaksi: " + err.message);
+                console.error(err);
+            }
+        };
+
         setFilter('today', document.querySelector('.btn-filter'));
     </script>
 </body>

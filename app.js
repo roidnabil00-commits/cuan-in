@@ -434,9 +434,64 @@ window.processFinalPayment = async () => {
             btnProses.style.backgroundColor = ""; 
         }
     }
-    // (GANTI BAGIAN TOMBOL DI BAWAH footerHtml DALAM FUNGSI renderStruk)
     
-    // Siapkan teks polos untuk RawBT (tanpa HTML)
+};
+
+function renderStruk(o) {
+    // 1. Header
+    const headerHtml = `
+        <div style="text-align:center; margin-bottom:5px;">
+            <h2 style="margin:0; font-size:14px; font-weight:bold;">${storeConfig.store_name}</h2>
+            <p style="margin:2px 0; font-size:9px;">${storeConfig.store_address}</p>
+            <p style="margin:0;">--------------------------------</p>
+        </div>
+        <div style="font-size:9px; margin-bottom:5px;">
+            <div>NO: ${o.order_number}</div>
+            <div>${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</div>
+            <div>KSR: ${escapeHtml(o.cashier_name || 'Staff')}</div>
+            <div>PLG: ${escapeHtml(o.customer_name)}</div>
+        </div>
+        <div style="margin:5px 0;">--------------------------------</div>
+    `;
+
+    // 2. List Item
+    let itemsHtml = '';
+    currentTransaction.items.forEach(i => {
+        itemsHtml += `
+            <div style="margin-bottom:2px;">
+                <div style="font-weight:bold;">${i.name}</div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>${i.qty} x ${i.price.toLocaleString()}</span>
+                    <span>${(i.price * i.qty).toLocaleString()}</span>
+                </div>
+            </div>`;
+    });
+
+    // 3. Footer
+    const taxHtml = o.tax > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Tax</span><span>${o.tax.toLocaleString()}</span></div>` : '';
+    const servHtml = o.service > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Service</span><span>${o.service.toLocaleString()}</span></div>` : '';
+
+    const footerHtml = `
+        <div style="margin:5px 0;">--------------------------------</div>
+        <div style="font-weight:bold;">
+            <div style="display:flex; justify-content:space-between;"><span>SUBTOTAL</span><span>${o.subtotal.toLocaleString()}</span></div>
+            ${taxHtml}
+            ${servHtml}
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:2px;">
+                <span>TOTAL</span><span>Rp ${o.grand_total.toLocaleString()}</span>
+            </div>
+        </div>
+        <div style="margin:5px 0;">--------------------------------</div>
+        <div style="display:flex; justify-content:space-between;"><span>BAYAR (${o.payment_method})</span><span>${o.amount_received.toLocaleString()}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>KEMBALI</span><span>${o.change_amount.toLocaleString()}</span></div>
+        
+        <div style="text-align:center; margin-top:10px; margin-bottom:0px; padding-bottom:5px;">
+            <p style="margin:0;">${storeConfig.store_footer}</p>
+            <p style="margin-top:5px;">--- TERIMA KASIH ---</p>
+        </div>
+    `;
+
+    // 4. Siapkan Teks Polos untuk RawBT (DISINI TEMPAT YANG BENAR)
     const rawText = `
 ${storeConfig.store_name}
 ${storeConfig.store_address}
@@ -458,6 +513,7 @@ ${storeConfig.store_footer}
     // Encode ke format URL RawBT
     const rawbtUrl = "rawbt:data:base64," + btoa(rawText);
 
+    // 5. Render ke Modal
     const modalBox = document.querySelector('#modal-struk .modal-box');
     modalBox.innerHTML = `
         ${headerHtml}
@@ -471,76 +527,6 @@ ${storeConfig.store_footer}
 
             <button onclick="window.print()" style="width:100%; padding:10px; background:#ccc; color:#333; border:none; cursor:pointer;">🖨️ PREVIEW PRINT</button>
             <button onclick="document.getElementById('modal-struk').style.display='none'" style="width:100%; padding:10px; border:1px solid red; color:red; background:white; margin-top:5px; cursor:pointer;">TUTUP</button>
-        </div>
-    `;
-};
-
-// GANTI FUNGSI renderStruk(o) DENGAN INI:
-function renderStruk(o) {
-    // 1. Header (Tengah)
-    const headerHtml = `
-        <div style="text-align:center; margin-bottom:5px;">
-            <h2 style="margin:0; font-size:14px; font-weight:bold;">${storeConfig.store_name}</h2>
-            <p style="margin:2px 0; font-size:9px;">${storeConfig.store_address}</p>
-            <p style="margin:0;">--------------------------------</p>
-        </div>
-        <div style="font-size:9px; margin-bottom:5px;">
-            <div>NO: ${o.order_number}</div>
-            <div>${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</div>
-            <div>KSR: ${escapeHtml(o.cashier_name || 'Staff')}</div>
-            <div>PLG: ${escapeHtml(o.customer_name)}</div>
-        </div>
-        <div style="margin:5px 0;">--------------------------------</div>
-    `;
-
-    // 2. List Item (Sederhana)
-    let itemsHtml = '';
-    currentTransaction.items.forEach(i => {
-        // Trik: Nama barang di baris sendiri jika panjang, harga di bawahnya
-        itemsHtml += `
-            <div style="margin-bottom:2px;">
-                <div style="font-weight:bold;">${i.name}</div>
-                <div style="display:flex; justify-content:space-between;">
-                    <span>${i.qty} x ${i.price.toLocaleString()}</span>
-                    <span>${(i.price * i.qty).toLocaleString()}</span>
-                </div>
-            </div>`;
-    });
-
-    // 3. Footer (Kalkulasi)
-    const taxHtml = o.tax > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Tax</span><span>${o.tax.toLocaleString()}</span></div>` : '';
-    const servHtml = o.service > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Service</span><span>${o.service.toLocaleString()}</span></div>` : '';
-
-    // (GANTI BAGIAN footerHtml INI DI APP.JS)
-    const footerHtml = `
-        <div style="margin:5px 0;">--------------------------------</div>
-        <div style="font-weight:bold;">
-            <div style="display:flex; justify-content:space-between;"><span>SUBTOTAL</span><span>${o.subtotal.toLocaleString()}</span></div>
-            ${taxHtml}
-            ${servHtml}
-            <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:2px;">
-                <span>TOTAL</span><span>Rp ${o.grand_total.toLocaleString()}</span>
-            </div>
-        </div>
-        <div style="margin:5px 0;">--------------------------------</div>
-        <div style="display:flex; justify-content:space-between;"><span>BAYAR (${o.payment_method})</span><span>${o.amount_received.toLocaleString()}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>KEMBALI</span><span>${o.change_amount.toLocaleString()}</span></div>
-        
-        <div style="text-align:center; margin-top:10px; margin-bottom:0px; padding-bottom:5px;"> <p style="margin:0;">${storeConfig.store_footer}</p>
-            <p style="margin-top:5px;">--- TERIMA KASIH ---</p>
-        </div>
-    `;
-
-    // 4. Render ke Modal
-    const modalBox = document.querySelector('#modal-struk .modal-box');
-    modalBox.innerHTML = `
-        ${headerHtml}
-        ${itemsHtml}
-        ${footerHtml}
-        
-        <div style="margin-top:10px; border-top:1px solid #ddd; padding-top:10px;">
-            <button onclick="window.print()" style="width:100%; padding:12px; background:#333; color:white; border:none; font-weight:bold; cursor:pointer;">🖨️ PRINT STRUK</button>
-            <button onclick="document.getElementById('modal-struk').style.display='none'" style="width:100%; padding:10px; border:1px solid #ff4757; color:#ff4757; background:white; margin-top:5px; cursor:pointer;">TUTUP</button>
         </div>
     `;
 }

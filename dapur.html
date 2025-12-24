@@ -86,10 +86,14 @@
         import { db } from './db-config.js';
 
         // 1. JAM DIGITAL
+        // 1. JAM DIGITAL (Force Jakarta)
         setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID', {
+                timeZone: 'Asia/Jakarta', 
+                hour: '2-digit', 
+                minute:'2-digit'
+            });
         }, 1000);
-
         let existingOrderIds = new Set();
         let isFirstLoad = true; // Penanda penting agar load awal tidak bunyi berisik (kecuali diinginkan)
 

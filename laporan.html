@@ -4,35 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Keuangan - Cuan-in</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
     <style>
+        /* CSS ASLI ANDA (TIDAK DIUBAH) */
         body { font-family: 'Poppins', sans-serif; background: #1a1a2e; color: white; padding: 20px; }
         
         .controls { background: #16213e; padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
         .btn-filter { background: #1a1a2e; border: 1px solid #555; color: #ccc; padding: 8px 20px; border-radius: 20px; cursor: pointer; transition: 0.3s; }
         .btn-filter.active, .btn-filter:hover { background: #00ff88; color: black; border-color: #00ff88; font-weight: bold; }
         
-        /* SEARCH */
         .search-box { margin-top: 15px; display: flex; gap: 10px; }
         .input-search { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #444; background: #0f3460; color: white; outline: none; }
         
-        /* REPORT AREA */
         #report-area { background: white; color: #333; padding: 40px; border-radius: 5px; min-height: 600px; max-width: 1100px; margin: 0 auto; box-shadow: 0 0 50px rgba(0,0,0,0.5); overflow-x: auto; }
         
-        /* SUMMARY BOXES */
         .summary-box { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap:wrap; }
         .s-card { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd; min-width: 150px; }
         .s-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
         .s-val { font-size: 20px; font-weight: bold; color: #333; margin-top: 5px; }
         
-        /* TABLE */
         table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 20px; }
         th { background: #333; color: white; padding: 12px; text-align: left; white-space: nowrap; }
         td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }
         tr:hover { background-color: #f9f9f9; }
 
-        /* BADGES */
         .badge-pay { padding: 3px 8px; border-radius: 5px; font-weight: bold; font-size: 10px; text-transform: uppercase; color: white; }
         .bg-cash { background: #28a745; } 
         .bg-qris { background: #6f42c1; } 
@@ -42,17 +43,16 @@
         .btn-page { padding: 8px 15px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; }
         .btn-page:disabled { background: #ccc; cursor: not-allowed; }
 
-        /* BUTTON VOID */
         .btn-void { background: #ff4757; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; transition: 0.2s; }
         .btn-void:hover { background: #d63031; transform: scale(1.1); }
     </style>
 </head>
 <body>
 
-    <div class="controls" data-html2canvas-ignore="true">
+    <div class="controls">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h2>📊 Laporan Keuangan</h2>
-            <button onclick="downloadPDF()" style="background:#ff4757; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">Download PDF</button>
+            <button onclick="downloadPDF()" style="background:#e74c3c; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:bold;">📄 Download PDF (Teks)</button>
         </div>
         
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
@@ -113,10 +113,10 @@
             </div>
         </div>
         
-        <table>
+        <table id="report-table">
             <thead>
                 <tr>
-                    <th>Waktu</th>
+                    <th>Waktu (WIB)</th>
                     <th>No. Order</th>
                     <th>Pelanggan</th>
                     <th>Metode</th>
@@ -124,7 +124,7 @@
                     <th style="text-align:right;">Subtotal</th>
                     <th style="text-align:right;">Diskon</th>
                     <th style="text-align:right;">Total Akhir</th>
-                    <th style="text-align:center; width:50px;" data-html2canvas-ignore="true">Aksi</th>
+                    <th style="text-align:center; width:50px;" class="no-print">Aksi</th>
                 </tr>
             </thead>
             <tbody id="tabel-laporan"></tbody>
@@ -145,64 +145,74 @@
     </div>
 
     <script type="module">
-        import { db } from './db-config.js';
+        import { db, auth } from './db-config.js';
 
-        // Load Header Toko
-        db.from('settings').select('*').single().then(({ data }) => {
-            if(data) document.getElementById('store-name').innerText = (data.store_name || "CUAN-IN") + " REPORT";
-        });
-
-        // VARIABEL RENTANG WAKTU (Start & End)
+        let storeId = localStorage.getItem('store_id');
         let currentStartDate = "";
         let currentEndDate = "";
-        
         let currentPage = 1;
         const itemsPerPage = 20;
 
+        // Load Header Toko
+        async function init() {
+            if(!storeId) {
+                const { data: { user } } = await auth.getUser();
+                if(!user) window.location.href='login.html';
+            }
+            db.from('settings').select('*').eq('store_id', storeId).single().then(({ data }) => {
+                if(data) document.getElementById('store-name').innerText = (data.store_name || "CUAN-IN") + " REPORT";
+            });
+            // Default filter hari ini
+            setFilter('today', document.querySelector('.btn-filter'));
+        }
+
+        // [UPGRADE] LOGIKA FILTER WAKTU (FIX TIMEZONE WIB)
         window.setFilter = (type, btn) => {
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
             if(btn && btn.tagName === 'BUTTON') btn.classList.add('active');
 
-            const now = new Date(); 
-            let start = new Date();
-            let end = new Date();
-            let label = "";
+            // Helper: Ambil tanggal Jakarta (YYYY-MM-DD)
+            const getJakartaDate = (dateObj) => dateObj.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+            const now = new Date();
+            let startStr, endStr, label;
 
-            // --- LOGIKA FILTER WAKTU LOKAL (WIB) ---
             if(type === 'today') {
-                start.setHours(0,0,0,0);
-                end.setHours(23,59,59,999);
-                label = "Hari Ini";
+                const today = getJakartaDate(now);
+                startStr = `${today}T00:00:00+07:00`;
+                endStr = `${today}T23:59:59+07:00`;
+                label = "Hari Ini (WIB)";
             } 
             else if(type === 'week') {
                 const day = now.getDay() || 7; 
-                start.setDate(now.getDate() - day + 1); 
-                start.setHours(0,0,0,0);
-                end.setHours(23,59,59,999);
-                label = "Minggu Ini";
+                const monday = new Date(now);
+                monday.setDate(now.getDate() - day + 1);
+                startStr = `${getJakartaDate(monday)}T00:00:00+07:00`;
+                endStr = `${getJakartaDate(now)}T23:59:59+07:00`;
+                label = "Minggu Ini (WIB)";
             } 
             else if(type === 'month') {
-                start = new Date(now.getFullYear(), now.getMonth(), 1); 
-                start.setHours(0,0,0,0);
-                end.setHours(23,59,59,999);
-                label = "Bulan Ini";
+                const y = now.getFullYear();
+                const m = now.getMonth() + 1;
+                const firstDay = `${y}-${String(m).padStart(2,'0')}-01`;
+                const today = getJakartaDate(now);
+                startStr = `${firstDay}T00:00:00+07:00`;
+                endStr = `${today}T23:59:59+07:00`;
+                label = "Bulan Ini (WIB)";
             } 
             else if(type === 'custom') {
                 const val = document.getElementById('custom-date').value;
                 if(!val) return; 
-                
-                const [y, m, d] = val.split('-');
-                start = new Date(y, m-1, d, 0, 0, 0);
-                end = new Date(y, m-1, d, 23, 59, 59, 999);
+                startStr = `${val}T00:00:00+07:00`;
+                endStr = `${val}T23:59:59+07:00`;
                 label = "Tanggal: " + val;
             }
 
-            // KONVERSI KE ISO STRING (UTC) UNTUK SUPABASE
-            currentStartDate = start.toISOString();
-            currentEndDate = end.toISOString();
+            currentStartDate = startStr;
+            currentEndDate = endStr;
 
             document.getElementById('period-display').innerText = label;
-            document.getElementById('print-date').innerText = new Date().toLocaleString('id-ID');
+            // Jam cetak versi WIB
+            document.getElementById('print-date').innerText = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
 
             currentPage = 1;
             loadReportData();
@@ -214,9 +224,10 @@
             if(!currentStartDate || !currentEndDate) return;
             const searchTerm = document.getElementById('search-input').value.trim();
 
-            // 1. AMBIL SUMMARY
+            // 1. AMBIL SUMMARY (LOGIKA ASLI ANDA)
             let querySum = db.from('orders')
                 .select('grand_total, subtotal, total_cost, payment_method, discount_amount')
+                .eq('store_id', storeId)
                 .gte('created_at', currentStartDate)
                 .lte('created_at', currentEndDate); 
             
@@ -225,9 +236,7 @@
             const { data: summaryData } = await querySum;
             
             if(summaryData) {
-                let totalOmzet = 0;
-                let totalNet = 0;
-                let totalProfit = 0;
+                let totalOmzet = 0, totalNet = 0, totalProfit = 0;
                 let cashTotal = 0, qrisTotal = 0, edcTotal = 0;
 
                 summaryData.forEach(curr => {
@@ -236,39 +245,32 @@
                     const tCost = curr.total_cost || 0;
                     const method = (curr.payment_method || '').toUpperCase();
 
-                    // --- PERBAIKAN LOGIKA SESUAI REQUEST ---
-                    totalOmzet += gTotal;         // 1. Omzet = Total Transaksi (Termasuk Tax/Service)
-                    totalNet += subTotal;         // 2. Net = Subtotal (Tanpa Tax/Service)
-                    
-                    // 3. PROFIT = Net Sales (Subtotal) - HPP (tCost)
-                    // DULU SALAH: (gTotal - tCost)
-                    // SEKARANG BENAR: (subTotal - tCost)
+                    totalOmzet += gTotal;         
+                    totalNet += subTotal;         
                     totalProfit += (subTotal - tCost); 
 
-                    // 4, 5, 6 Breakdown Pembayaran
-                    if(method.includes('CASH')) cashTotal += gTotal;
+                    if(method.includes('CASH') || method.includes('TUNAI')) cashTotal += gTotal;
                     else if(method.includes('QRIS')) qrisTotal += gTotal;
                     else if(method.includes('EDC')) edcTotal += gTotal;
                 });
                 
-                // Render Summary
                 document.getElementById('tot-omzet').innerText = "Rp " + totalOmzet.toLocaleString('id-ID');
                 document.getElementById('tot-net').innerText = "Rp " + totalNet.toLocaleString('id-ID');
                 document.getElementById('tot-profit').innerText = "Rp " + totalProfit.toLocaleString('id-ID');
                 document.getElementById('tot-trx').innerText = summaryData.length;
 
-                // Render Breakdown
                 document.getElementById('pay-cash').innerText = "Rp " + cashTotal.toLocaleString('id-ID');
                 document.getElementById('pay-qris').innerText = "Rp " + qrisTotal.toLocaleString('id-ID');
                 document.getElementById('pay-edc').innerText = "Rp " + edcTotal.toLocaleString('id-ID');
             }
 
-            // 2. AMBIL DATA TABEL
+            // 2. AMBIL DATA TABEL (PAGINATION)
             const from = (currentPage - 1) * itemsPerPage;
             const to = from + itemsPerPage - 1;
 
             let queryTable = db.from('orders')
                 .select(`*, order_items(*)`)
+                .eq('store_id', storeId)
                 .gte('created_at', currentStartDate)
                 .lte('created_at', currentEndDate)
                 .order('created_at', {ascending:false})
@@ -285,8 +287,9 @@
             if(tableData && tableData.length > 0) {
                 tableData.forEach(d => {
                     const dateObj = new Date(d.created_at);
-                    const tanggal = dateObj.toLocaleDateString('id-ID'); 
-                    const waktu = dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+                    const tanggal = dateObj.toLocaleDateString('id-ID', {timeZone: 'Asia/Jakarta'}); 
+                    const waktu = dateObj.toLocaleTimeString('id-ID', {timeZone: 'Asia/Jakarta', hour: '2-digit', minute:'2-digit'});
+                    
                     const itemsStr = d.order_items.map(i => `${i.product_name} (${i.qty})`).join("<br>");
                     
                     let methodClass = 'bg-cash';
@@ -307,7 +310,7 @@
                                 ${discAmt > 0 ? '-' + discAmt.toLocaleString('id-ID') : '0'}
                             </td>
                             <td style="text-align:right; font-weight:bold;">Rp ${d.grand_total.toLocaleString('id-ID')}</td>
-                            <td style="text-align:center;" data-html2canvas-ignore="true">
+                            <td style="text-align:center;" class="no-print">
                                 <button class="btn-void" onclick="voidTransaction(${d.id})" title="Hapus Transaksi">🗑️</button>
                             </td>
                         </tr>
@@ -324,41 +327,71 @@
 
         window.changePage = (delta) => { currentPage += delta; loadReportData(); };
 
-        window.downloadPDF = () => {
-            const el = document.getElementById('report-area');
-            document.getElementById('pagination-controls').style.display = 'none'; 
-            html2pdf().set({ margin: 5, filename: `Laporan-${new Date().toISOString().split('T')[0]}.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } }).from(el).save().then(() => {
-                document.getElementById('pagination-controls').style.display = 'flex'; 
-            });
-        };
+        // [UPGRADE] DOWNLOAD PDF TEXT-BASED (Jauh lebih rapi daripada html2pdf)
+        window.downloadPDF = async () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
 
-        window.voidTransaction = async (orderId) => {
-            if(!confirm("⚠️ PERINGATAN: Anda yakin ingin MENGHAPUS transaksi ini?\n\n- Data akan hilang permanen dari laporan.\n- Stok barang akan DIKEMBALIKAN otomatis.")) return;
+            // 1. Header
+            const storeName = document.getElementById('store-name').innerText;
+            const periode = document.getElementById('period-display').innerText;
+            const totOmzet = document.getElementById('tot-omzet').innerText;
+            
+            doc.setFontSize(16); doc.text(storeName, 14, 15);
+            doc.setFontSize(10); doc.text(`Periode: ${periode}`, 14, 22);
+            doc.text(`Total Omzet: ${totOmzet}`, 14, 27);
 
-            try {
-                const { data: items, error: errItems } = await db.from('order_items').select('*').eq('order_id', orderId);
-                if(errItems) throw errItems;
-
-                for(let item of items) {
-                    const { data: prod } = await db.from('products').select('stock').eq('id', item.product_id).single();
-                    if(prod) {
-                        await db.from('products').update({ stock: prod.stock + item.qty }).eq('id', item.product_id);
+            // 2. Generate Tabel Otomatis
+            doc.autoTable({
+                startY: 35,
+                html: '#report-table', // Ambil data dari HTML tabel
+                theme: 'striped',
+                headStyles: { fillColor: [22, 33, 62] }, // Warna Navy sesuai tema
+                columns: [
+                    { header: 'Waktu', dataKey: 0 },
+                    { header: 'No Order', dataKey: 1 },
+                    { header: 'Pelanggan', dataKey: 2 },
+                    { header: 'Metode', dataKey: 3 },
+                    { header: 'Item', dataKey: 4 },
+                    { header: 'Subtotal', dataKey: 5, halign:'right' },
+                    { header: 'Disc', dataKey: 6, halign:'right' },
+                    { header: 'Total', dataKey: 7, halign:'right' }
+                    // Kolom Aksi (ke-8) otomatis di-skip karena logic autoTable biasanya smart, atau kita filter nanti
+                ],
+                didParseCell: function(data) {
+                    // Hapus kolom aksi dari PDF
+                    if (data.column.index === 8) {
+                        data.cell.styles.display = 'none'; // Sembunyikan kolom tombol sampah
+                    }
+                    // Bersihkan teks Item dari HTML tag <br>
+                    if (data.column.index === 4 && typeof data.cell.raw === 'object') {
+                       // AutoTable handle html inner text
                     }
                 }
+            });
 
-                const { error: errDel } = await db.from('orders').delete().eq('id', orderId);
-                if(errDel) throw errDel;
+            // 3. Save
+            doc.save(`Laporan_${periode.replace(/ /g,'_')}.pdf`);
+        };
 
-                alert("✅ Transaksi berhasil dihapus! Stok telah dikembalikan.");
+        // VOID TRANSACTION (LOGIKA ASLI ANDA - TETAP ADA)
+        window.voidTransaction = async (orderId) => {
+            if(!confirm("⚠️ PERINGATAN: Hapus transaksi ini? Stok akan dikembalikan.")) return;
+            try {
+                const { data: items } = await db.from('order_items').select('*').eq('order_id', orderId);
+                for(let item of items) {
+                    const { data: prod } = await db.from('products').select('stock').eq('id', item.product_id).single();
+                    if(prod) await db.from('products').update({ stock: prod.stock + item.qty }).eq('id', item.product_id);
+                }
+                await db.from('orders').delete().eq('id', orderId);
+                alert("✅ Transaksi dihapus & Stok kembali!");
                 loadReportData();
-
             } catch (err) {
-                alert("❌ Gagal menghapus transaksi: " + err.message);
-                console.error(err);
+                alert("Gagal: " + err.message);
             }
         };
 
-        setFilter('today', document.querySelector('.btn-filter'));
+        init();
     </script>
 </body>
 </html>

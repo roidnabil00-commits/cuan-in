@@ -340,16 +340,27 @@
         };
 
         // --- DASHBOARD ---
+        // --- DASHBOARD (FIX TIMEZONE) ---
         function loadDashboard() {
-            const today = new Date().toISOString().split('T')[0];
-            db.from('orders').select('created_at, grand_total').gte('created_at', today).order('created_at', {ascending:true})
+            // 1. Ambil Tanggal Hari Ini versi Jakarta (YYYY-MM-DD)
+            // Trik: Tambahkan jam 00:00:00+07:00 agar Supabase paham ini start hari Jakarta
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+            const todayISO = `${todayStr}T00:00:00+07:00`; // Format ISO dengan Offset WIB
+
+            db.from('orders')
+              .select('created_at, grand_total')
+              .gte('created_at', todayISO) // Filter mulai dari jam 00:00 WIB
+              .order('created_at', {ascending:true})
             .then(({ data }) => {
                 if(!data) return;
                 let omzet = 0, salesMap = {};
                 data.forEach(d => {
                     omzet += d.grand_total;
-                    const h = new Date(d.created_at).getHours() + ":00";
-                    salesMap[h] = (salesMap[h]||0) + d.grand_total;
+                    // Konversi jam transaksi ke WIB buat Grafik
+                    const dateObj = new Date(d.created_at);
+                    const localHour = dateObj.toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit' }) + ":00";
+                    
+                    salesMap[localHour] = (salesMap[localHour]||0) + d.grand_total;
                 });
                 document.getElementById('dash-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
                 document.getElementById('dash-count').innerText = data.length;

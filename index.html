@@ -57,33 +57,50 @@
             #mobile-cart-bar { display: flex; position: fixed; bottom: 20px; left: 5%; width: 90%; background: #16213e; padding: 15px; border-radius: 50px; justify-content: space-between; align-items: center; cursor: pointer; z-index: 200; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         }
         @media print {
-    /* Sembunyikan semua elemen KECUALI modal struk */
-    body * {
-        visibility: hidden;
-    }
-    #modal-struk, #modal-struk * {
-        visibility: visible;
-    }
-    #modal-struk {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: auto;
-        background: white;
-        color: black;
-        overflow: visible;
-    }
-    /* Hapus margin default browser agar hemat kertas */
-    @page {
-        margin: 0; 
-        size: auto; 
-    }
-    /* Sembunyikan tombol print & tutup saat dicetak */
-    .modal-box button {
-        display: none !important;
-    }
-}
+            /* 1. Reset Global */
+            body * { visibility: hidden; } /* Sembunyikan semua website */
+            
+            /* 2. Setting Kertas 58mm */
+            @page {
+                size: 58mm auto; /* Lebar 58mm, Tinggi Otomatis */
+                margin: 0mm; /* Hapus margin putih browser */
+            }
+
+            /* 3. Tampilkan Hanya Modal Struk */
+            #modal-struk, #modal-struk * {
+                visibility: visible; /* Munculkan struk */
+            }
+
+            #modal-struk {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%; /* Ikuti lebar kertas (58mm) */
+                margin: 0;
+                padding: 0;
+                background: white;
+                color: black;
+            }
+
+            /* 4. Desain Khusus Struk */
+            .modal-box {
+                width: 100% !important;
+                max-width: 58mm !important; /* Paksa lebar maksimal */
+                padding: 2px !important; /* Jarak aman pinggir kertas */
+                border: none !important;
+                box-shadow: none !important;
+                font-family: 'Courier New', Courier, monospace !important; /* Font Struk */
+                font-size: 10px !important; /* Ukuran pas 58mm */
+                line-height: 1.2;
+            }
+
+            /* Sembunyikan tombol saat print */
+            .modal-box button { display: none !important; }
+            
+            /* Garis putus-putus manual lebih rapi */
+            hr { border-top: 1px dashed black; }
+        }
+    
     </style>
 </head>
 <body>

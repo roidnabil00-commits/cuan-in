@@ -3,8 +3,11 @@ import { db, auth } from './db-config.js';
 // --- STATE ---
 let storeId = localStorage.getItem('store_id');
 let shiftId = localStorage.getItem('shift_id');
-let currentCashierName = 'Kasir'; // <--- (BARU) Variabel simpan nama
-let cart = []; 
+let currentCashierName = 'Kasir'; 
+
+// [PERBAIKAN 1] Ambil keranjang dari backup jika ada, kalau tidak ada buat array kosong
+let cart = JSON.parse(localStorage.getItem('pos_cart_backup') || "[]"); 
+
 let allProductsList = []; 
 let currentTransaction = {}; 
 let currentMethod = 'cash'; 
@@ -17,7 +20,8 @@ let storeConfig = {
     service_rate: 0 
 };
 let selectedProductForVariant = null;
-// Helper Anti-XSS (Taruh di paling atas app.js)
+
+// Helper Anti-XSS
 const escapeHtml = (unsafe) => {
     return (unsafe || "").replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -40,21 +44,25 @@ const els = {
 // --- HELPER FORMAT RUPIAH INPUT ---
 window.formatRupiah = (el) => {
     if(!el.value) return;
-    // 1. Hapus semua karakter selain angka
     let raw = el.value.replace(/\D/g, '');
-    // 2. Format jadi 1.000.000
     el.value = Number(raw).toLocaleString('id-ID');
 };
 
-// Helper untuk membersihkan titik sebelum save ke DB
 const cleanNum = (val) => Number(String(val).replace(/\./g,''));
 
 // --- INIT ---
 async function init() {
+    // Cek User Supabase (Valid atau Expired?)
+    const { data: { user }, error } = await auth.getUser();
+    
+    if (!user || error) {
+        localStorage.clear();
+        window.location.href = 'login.html';
+        return;
+    }
+
     if(!storeId) window.location.href = 'login.html';
     
-    // (BARU) AMBIL NAMA KASIR DARI DATABASE
-    const { data: { user } } = await auth.getUser();
     if(user) {
         const { data: profile } = await db.from('profiles').select('full_name').eq('id', user.id).single();
         if(profile && profile.full_name) {
@@ -73,7 +81,11 @@ async function init() {
     if(shift) {
         shiftId = shift.id;
         localStorage.setItem('shift_id', shift.id);
-        loadConfig().then(() => fetchMenu()); 
+        
+        // [PERBAIKAN 2] Load Config & Menu dulu, baru Update UI Cart agar keranjang muncul
+        await loadConfig();
+        await fetchMenu();
+        updateCartUI(); 
     } else {
         showShiftModal('open');
     }
@@ -87,11 +99,9 @@ async function loadConfig() {
 // --- SHIFT LOGIC ---
 function showShiftModal(mode) {
     els.modalShift.style.display = 'flex';
-    // Reset input value
     document.getElementById('shift-input').value = "";
     
     if(mode === 'open') {
-        // (BARU) Tampilkan sapaan nama kasir
         document.getElementById('shift-title').innerText = `☀️ Halo, ${currentCashierName}!`;
         document.getElementById('shift-desc').innerText = "Masukkan modal awal (uang di laci)";
         document.getElementById('btn-shift-action').innerText = "BUKA KASIR";
@@ -111,7 +121,6 @@ function showShiftModal(mode) {
 }
 
 async function openShift() {
-    // BERSIHKAN TITIK DULU SEBELUM SAVE
     const startCash = cleanNum(document.getElementById('shift-input').value);
     
     if(startCash === 0 && !confirm("Modal 0? Yakin?")) return;
@@ -124,11 +133,13 @@ async function openShift() {
     if(error) return alert("Gagal: " + error.message);
     shiftId = data.id; localStorage.setItem('shift_id', data.id);
     els.modalShift.style.display = 'none';
-    loadConfig().then(() => fetchMenu());
+    
+    await loadConfig();
+    await fetchMenu();
+    updateCartUI();
 }
 
 async function closeShift() {
-    // BERSIHKAN TITIK DULU SEBELUM SAVE
     const endCash = cleanNum(document.getElementById('shift-input').value);
     
     await db.from('shifts').update({ end_cash: endCash, end_time: new Date(), status: 'closed' }).eq('id', shiftId);
@@ -153,11 +164,9 @@ window.filterMenu = (cat, btn) => {
     
     list.forEach(p => {
         const hasVar = p.variants && p.variants.length > 0;
-        
-        // --- LOGIKA TAMPILAN STOK ---
         const isHabis = p.stock <= 0;
         const cardStyle = isHabis ? "opacity:0.6; background:#2a0f0f; border:1px solid red; cursor:not-allowed;" : "";
-        const clickEvent = isHabis ? "alert('Stok Habis!')" : `handleClickProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})`; // Escape quote aman
+        const clickEvent = isHabis ? "alert('Stok Habis!')" : `handleClickProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})`; 
         const labelHabis = isHabis ? "<div style='color:red; font-weight:bold; font-size:12px; margin-bottom:5px;'>❌ HABIS</div>" : "";
         
         els.menu.innerHTML += `
@@ -192,25 +201,20 @@ window.selectVariant = (idx) => {
 };
 
 function addToCart(p, variant) {
-    // 1. CEK STOK DASAR
     if (p.stock <= 0) {
         return alert("❌ Stok Habis! Tidak bisa dipilih.");
     }
 
     const uniqueId = p.id + (variant ? '-' + variant.name : '');
     
-    // 2. HITUNG TOTAL ITEM INI YANG SUDAH ADA DI KERANJANG
-    // Kita harus filter berdasarkan productId karena varian beda tetap mengurangi stok produk yang sama
     const totalQtyInCart = cart
         .filter(item => item.productId === p.id)
         .reduce((sum, item) => sum + item.qty, 0);
 
-    // 3. CEK APAKAH JIKA DITAMBAH 1 MASIH CUKUP?
     if (totalQtyInCart + 1 > p.stock) {
         return alert(`⚠️ Stok tidak cukup! Sisa stok fisik hanya: ${p.stock}`);
     }
 
-    // --- LOGIC LAMA (BAWAH) TETAP SAMA ---
     const price = p.price + (variant ? variant.price : 0);
     const name = p.name + (variant ? ` (${variant.name})` : '');
     const cost = p.cost_price || 0; 
@@ -226,13 +230,9 @@ window.changeQty = (uid, delta) => {
     const item = cart.find(c => c.uniqueId === uid);
     if(!item) return;
 
-    // JIKA MENAMBAH (+), CEK STOK DULU
     if (delta > 0) {
-        // Ambil data produk asli dari list global (allProductsList)
         const productAsli = allProductsList.find(p => p.id === item.productId);
-        
         if (productAsli) {
-            // Hitung total qty produk ini di keranjang saat ini
             const totalQtyInCart = cart
                 .filter(c => c.productId === item.productId)
                 .reduce((sum, i) => sum + i.qty, 0);
@@ -254,7 +254,6 @@ function updateCartUI() {
     els.cart.innerHTML = "";
     let subtotal = 0;
     
-    // Render Cart Items
     cart.forEach(c => {
         subtotal += c.price * c.qty;
         els.cart.innerHTML += `
@@ -269,7 +268,6 @@ function updateCartUI() {
             </div>`;
     });
 
-    // --- HITUNG TAX & SERVICE ---
     const taxRate = storeConfig.tax_rate || 0;
     const serviceRate = storeConfig.service_rate || 0;
     
@@ -277,7 +275,6 @@ function updateCartUI() {
     const service = Math.round(subtotal * (serviceRate / 100));
     const grand = Math.ceil(subtotal + tax + service);
 
-    // --- TAMPILKAN RINCIAN DI KASIR ---
     const detailHtml = `
         <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
             <span>Subtotal</span><span>Rp ${subtotal.toLocaleString()}</span>
@@ -290,7 +287,6 @@ function updateCartUI() {
     els.totalDisplay.innerText = "Rp " + grand.toLocaleString();
     document.getElementById('btn-checkout').disabled = cart.length === 0;
     
-    // Update Mobile Bar
     const mob = document.getElementById('mobile-total-display');
     if(mob) mob.innerText = "Rp " + grand.toLocaleString();
     if(cart.length > 0 && window.innerWidth <= 768) document.getElementById('mobile-cart-bar').style.display = 'flex';
@@ -299,6 +295,9 @@ function updateCartUI() {
     currentTransaction = { 
         subtotal, tax, service, grand_total: grand, items: cart 
     };
+
+    // [PERBAIKAN 3] Simpan otomatis ke memori HP setiap kali tampilan cart berubah
+    localStorage.setItem('pos_cart_backup', JSON.stringify(cart));
 }
 
 // --- PAYMENT ---
@@ -311,12 +310,10 @@ document.getElementById('btn-checkout').onclick = () => {
     
     document.getElementById('pay-total-display').innerText = "Rp " + currentTransaction.grand_total.toLocaleString();
     window.setPaymentMethod('cash');
-    // Reset input bayar
     document.getElementById('pay-input').value = "";
     els.modalPay.style.display = 'flex';
 };
 
-// --- EDC LOGIC ---
 window.updateEdcCode = () => {
     const bank = document.getElementById('edc-bank').value;
     const rnd = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
@@ -337,31 +334,22 @@ window.setPaymentMethod = (m) => {
 };
 
 window.calcChange = (el) => {
-    // 1. Format dulu tampilannya jadi Rupiah
     window.formatRupiah(el);
-    
-    // 2. Ambil angka aslinya (bersihkan titik) untuk hitung kembalian
     const val = cleanNum(el.value);
     const change = val - currentTransaction.grand_total;
-    
     document.getElementById('pay-change').innerText = change >= 0 ? "Rp "+change.toLocaleString() : "Kurang!";
 };
 
 window.fastCash = (amt) => {
     const val = amt === 'pas' ? currentTransaction.grand_total : amt;
-    // Format juga tombol fast cash
     document.getElementById('pay-input').value = val.toLocaleString('id-ID');
-    // Trigger hitung kembalian
     window.calcChange(document.getElementById('pay-input'));
 };
 
-// --- UPDATE APP.JS: PROCESS PAYMENT ---
-// --- UPDATE APP.JS: PROCESS PAYMENT (ANTI DOUBLE CLICK) ---
 window.processFinalPayment = async () => {
     const btnProses = document.getElementById('btn-process-pay');
     if (btnProses && btnProses.disabled) return;
 
-    // UI Loading
     if (btnProses) {
         btnProses.disabled = true;
         btnProses.innerText = "⏳ MENGHITUNG DI SERVER...";
@@ -369,7 +357,6 @@ window.processFinalPayment = async () => {
     }
 
     try {
-        // 1. SIAPKAN DATA INPUT (Hanya data mentah, jangan kirim hasil hitungan!)
         const rawAmountInput = cleanNum(document.getElementById('pay-input').value);
         
         let methodToSave = currentMethod.toUpperCase();
@@ -378,30 +365,23 @@ window.processFinalPayment = async () => {
             const code = document.getElementById('edc-code').value;
             methodToSave = `EDC ${bank} (${code})`;
         } else if (currentMethod === 'cash') {
-            methodToSave = 'TUNAI'; // Standarisasi string untuk SQL
+            methodToSave = 'TUNAI'; 
         } else if (currentMethod === 'qris') {
             methodToSave = 'QRIS';
         }
 
-        // 2. FORMAT ITEM UNTUK DIKIRIM KE SQL (Perhatikan 'variant_name')
-        // Kita perlu extract nama varian murni dari cart item name
-        // Cart name format di app.js lama: "Kopi (Es)" -> kita butuh "Es"
         const cleanItems = cart.map(item => {
             let varName = null;
-            // Cek logic cart kamu: UniqueId = "12-Es" atau nama = "Kopi (Es)"
-            // Kita coba ambil dari UniqueId atau parsing nama
-            // Paling aman: kita parsing nama yang ada kurungnya
             const match = item.name.match(/\(([^)]+)\)$/);
-            if (match) varName = match[1]; // Ambil text dalam kurung sebagai varian
+            if (match) varName = match[1]; 
 
             return {
                 product_id: item.productId,
                 qty: item.qty,
-                variant_name: varName // Kirim nama varian, biarkan DB cari harganya
+                variant_name: varName 
             };
         });
 
-        // 3. PANGGIL FUNGSI SERVER (RPC)
         const payload = {
             p_store_id: storeId,
             p_cashier_name: currentCashierName,
@@ -416,31 +396,30 @@ window.processFinalPayment = async () => {
 
         const { data: resultStruk, error } = await db.rpc('process_transaction_secure', payload);
 
-        if (error) throw new Error(error.message); // Error stok/uang kurang akan muncul disini
+        if (error) throw new Error(error.message); 
 
-        // 4. SUKSES! UPDATE UI DENGAN HASIL DARI SERVER
-        // Kita perlu menyusun objek 'order' agar fungsi renderStruk(order) tetap jalan
-        // Karena RPC cuma return sedikit data, kita gabungkan manual untuk tampilan struk
         const orderForStruk = {
             order_number: resultStruk.order_number,
             customer_name: currentTransaction.customer_name,
             cashier_name: currentCashierName,
-            subtotal: currentTransaction.subtotal, // Visual sementara (karena DB sudah hitung ulang)
-            tax: currentTransaction.tax,           // Visual sementara
-            service: currentTransaction.service,   // Visual sementara
-            grand_total: resultStruk.grand_total,  // PENTING: Ini dari server
+            subtotal: currentTransaction.subtotal, 
+            tax: currentTransaction.tax,           
+            service: currentTransaction.service,   
+            grand_total: resultStruk.grand_total,  
             payment_method: methodToSave,
             amount_received: rawAmountInput || resultStruk.grand_total,
-            change_amount: resultStruk.change_amount // PENTING: Ini dari server
+            change_amount: resultStruk.change_amount 
         };
 
         els.modalPay.style.display = 'none';
-        renderStruk(orderForStruk); // Panggil fungsi render struk lama
+        renderStruk(orderForStruk); 
         els.modalStruk.style.display = 'flex';
         
-        // Reset
+        // [PERBAIKAN 4] Reset Keranjang & Hapus Backup
         cart = []; 
         updateCartUI(); 
+        localStorage.removeItem('pos_cart_backup'); // Bersihkan memori HP
+
         document.getElementById('cust-name').value = ""; 
         document.getElementById('table-num').value = ""; 
         document.getElementById('pay-input').value = ""; 
@@ -455,102 +434,139 @@ window.processFinalPayment = async () => {
             btnProses.style.backgroundColor = ""; 
         }
     }
-};
-function renderStruk(o) {
-    const headerHtml = `
-        <div style="border-bottom:1px dashed #000; padding-bottom:10px; margin-bottom:10px; text-align:center;">
-            <h3 style="margin:0;">${storeConfig.store_name}</h3>
-            <p style="margin:0; font-size:10px;">${storeConfig.store_address}</p>
-            <br>
-            <div style="display:flex; justify-content:space-between; font-size:10px;">
-                <span>NO: ${o.order_number}</span>
-                <span>${new Date().toLocaleTimeString()}</span>
-            </div>
-            <div style="text-align:left; font-size:10px;">
-        <div>Pelanggan: ${escapeHtml(o.customer_name)}</div> <div>Kasir: ${escapeHtml(o.cashier_name || 'Staff')}</div> 
-    </div>
+    // (GANTI BAGIAN TOMBOL DI BAWAH footerHtml DALAM FUNGSI renderStruk)
+    
+    // Siapkan teks polos untuk RawBT (tanpa HTML)
+    const rawText = `
+${storeConfig.store_name}
+${storeConfig.store_address}
+--------------------------------
+NO: ${o.order_number}
+TGL: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
+KSR: ${o.cashier_name || 'Staff'}
+PLG: ${o.customer_name}
+--------------------------------
+${currentTransaction.items.map(i => `${i.name}\n${i.qty} x ${i.price.toLocaleString()} = ${(i.price*i.qty).toLocaleString()}`).join('\n')}
+--------------------------------
+TOTAL: Rp ${o.grand_total.toLocaleString()}
+BAYAR: Rp ${o.amount_received.toLocaleString()}
+KEMBALI: Rp ${o.change_amount.toLocaleString()}
+--------------------------------
+${storeConfig.store_footer}
     `;
-
-    let itemsHtml = '';
-    currentTransaction.items.forEach(i => {
-        itemsHtml += `
-            <div style="display:flex; justify-content:space-between; font-size:12px;">
-                <span>${i.qty}x ${i.name}</span>
-                <span>${(i.price * i.qty).toLocaleString()}</span>
-            </div>`;
-    });
-
-    const taxHtml = o.tax > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Tax</span><span>${o.tax.toLocaleString()}</span></div>` : '';
-    const servHtml = o.service > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Service</span><span>${o.service.toLocaleString()}</span></div>` : '';
-
-    const footerHtml = `
-        <div style="border-top:1px dashed #000; margin-top:10px; padding-top:5px; font-size:12px;">
-            <div style="display:flex; justify-content:space-between;"><span>Subtotal</span><span>${o.subtotal.toLocaleString()}</span></div>
-            ${taxHtml}
-            ${servHtml}
-            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:14px; margin:5px 0;">
-                <span>TOTAL</span><span>Rp ${o.grand_total.toLocaleString()}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between;"><span>Metode</span><span>${o.payment_method}</span></div>
-            <div style="display:flex; justify-content:space-between;"><span>Bayar</span><span>${o.amount_received.toLocaleString()}</span></div>
-            <div style="display:flex; justify-content:space-between;"><span>Kembali</span><span>${o.change_amount.toLocaleString()}</span></div>
-        </div>
-        <div style="text-align:center; margin-top:15px; font-size:10px;">${storeConfig.store_footer}</div>
-    `;
+    
+    // Encode ke format URL RawBT
+    const rawbtUrl = "rawbt:data:base64," + btoa(rawText);
 
     const modalBox = document.querySelector('#modal-struk .modal-box');
     modalBox.innerHTML = `
         ${headerHtml}
         ${itemsHtml}
         ${footerHtml}
-        <button onclick="window.print()" style="width:100%; padding:10px; background:#333; color:white; border:none; margin-top:20px;">PRINT</button>
-        <button onclick="document.getElementById('modal-struk').style.display='none'" style="width:100%; padding:10px; border:1px solid red; color:red; margin-top:5px; background:white;">TUTUP</button>
+        
+        <div style="margin-top:10px; border-top:1px solid #ddd; padding-top:10px;">
+            <a href="${rawbtUrl}" style="text-decoration:none;">
+                <button style="width:100%; padding:12px; background:#000; color:#fff; border:none; font-weight:bold; cursor:pointer; margin-bottom:5px;">⚡ DIRECT PRINT (RawBT)</button>
+            </a>
+
+            <button onclick="window.print()" style="width:100%; padding:10px; background:#ccc; color:#333; border:none; cursor:pointer;">🖨️ PREVIEW PRINT</button>
+            <button onclick="document.getElementById('modal-struk').style.display='none'" style="width:100%; padding:10px; border:1px solid red; color:red; background:white; margin-top:5px; cursor:pointer;">TUTUP</button>
+        </div>
+    `;
+};
+
+// GANTI FUNGSI renderStruk(o) DENGAN INI:
+function renderStruk(o) {
+    // 1. Header (Tengah)
+    const headerHtml = `
+        <div style="text-align:center; margin-bottom:5px;">
+            <h2 style="margin:0; font-size:14px; font-weight:bold;">${storeConfig.store_name}</h2>
+            <p style="margin:2px 0; font-size:9px;">${storeConfig.store_address}</p>
+            <p style="margin:0;">--------------------------------</p>
+        </div>
+        <div style="font-size:9px; margin-bottom:5px;">
+            <div>NO: ${o.order_number}</div>
+            <div>${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</div>
+            <div>KSR: ${escapeHtml(o.cashier_name || 'Staff')}</div>
+            <div>PLG: ${escapeHtml(o.customer_name)}</div>
+        </div>
+        <div style="margin:5px 0;">--------------------------------</div>
+    `;
+
+    // 2. List Item (Sederhana)
+    let itemsHtml = '';
+    currentTransaction.items.forEach(i => {
+        // Trik: Nama barang di baris sendiri jika panjang, harga di bawahnya
+        itemsHtml += `
+            <div style="margin-bottom:2px;">
+                <div style="font-weight:bold;">${i.name}</div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>${i.qty} x ${i.price.toLocaleString()}</span>
+                    <span>${(i.price * i.qty).toLocaleString()}</span>
+                </div>
+            </div>`;
+    });
+
+    // 3. Footer (Kalkulasi)
+    const taxHtml = o.tax > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Tax</span><span>${o.tax.toLocaleString()}</span></div>` : '';
+    const servHtml = o.service > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Service</span><span>${o.service.toLocaleString()}</span></div>` : '';
+
+    // (GANTI BAGIAN footerHtml INI DI APP.JS)
+    const footerHtml = `
+        <div style="margin:5px 0;">--------------------------------</div>
+        <div style="font-weight:bold;">
+            <div style="display:flex; justify-content:space-between;"><span>SUBTOTAL</span><span>${o.subtotal.toLocaleString()}</span></div>
+            ${taxHtml}
+            ${servHtml}
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:2px;">
+                <span>TOTAL</span><span>Rp ${o.grand_total.toLocaleString()}</span>
+            </div>
+        </div>
+        <div style="margin:5px 0;">--------------------------------</div>
+        <div style="display:flex; justify-content:space-between;"><span>BAYAR (${o.payment_method})</span><span>${o.amount_received.toLocaleString()}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>KEMBALI</span><span>${o.change_amount.toLocaleString()}</span></div>
+        
+        <div style="text-align:center; margin-top:10px; margin-bottom:0px; padding-bottom:5px;"> <p style="margin:0;">${storeConfig.store_footer}</p>
+            <p style="margin-top:5px;">--- TERIMA KASIH ---</p>
+        </div>
+    `;
+
+    // 4. Render ke Modal
+    const modalBox = document.querySelector('#modal-struk .modal-box');
+    modalBox.innerHTML = `
+        ${headerHtml}
+        ${itemsHtml}
+        ${footerHtml}
+        
+        <div style="margin-top:10px; border-top:1px solid #ddd; padding-top:10px;">
+            <button onclick="window.print()" style="width:100%; padding:12px; background:#333; color:white; border:none; font-weight:bold; cursor:pointer;">🖨️ PRINT STRUK</button>
+            <button onclick="document.getElementById('modal-struk').style.display='none'" style="width:100%; padding:10px; border:1px solid #ff4757; color:#ff4757; background:white; margin-top:5px; cursor:pointer;">TUTUP</button>
+        </div>
     `;
 }
-
 // Start
 init();
 
-// ============================================================
-// 🔌 FITUR DETEKSI KONEKSI INTERNET (OFFLINE PROTECTION)
-// Paste kode ini di bagian paling bawah file app.js
-// ============================================================
-
+// DETEKSI KONEKSI INTERNET
 function checkConnectionStatus() {
     const isOnline = navigator.onLine;
     const btnCheckout = document.getElementById('btn-checkout');
     const displayTotal = document.getElementById('btn-total');
 
     if (!isOnline) {
-        // --- LOGIKA SAAT OFFLINE ---
-        // 1. Matikan tombol bayar
         btnCheckout.disabled = true;
-        
-        // 2. Ubah tampilan visual agar kasir sadar
-        btnCheckout.style.backgroundColor = "#555"; // Jadi abu-abu
+        btnCheckout.style.backgroundColor = "#555";
         btnCheckout.style.color = "#aaa";
         btnCheckout.style.cursor = "not-allowed";
-        
-        // 3. Beri peringatan teks
         if (displayTotal) displayTotal.innerText = "🚫 OFFLINE";
-        
     } else {
-        // --- LOGIKA SAAT ONLINE KEMBALI ---
-        // 1. Reset style ke default (mengikuti CSS)
         btnCheckout.style.backgroundColor = ""; 
         btnCheckout.style.color = "";
         btnCheckout.style.cursor = "";
-
-        // 2. Panggil ulang fungsi updateCartUI() yang sudah ada di atas
-        // Ini penting agar tombol kembali enable/disable sesuai jumlah keranjang
-        // dan angka total harga kembali muncul.
         updateCartUI(); 
     }
 }
 
-// Pasang "Telinga" (Event Listener) untuk memantau koneksi
 window.addEventListener('online', checkConnectionStatus);
 window.addEventListener('offline', checkConnectionStatus);
-
-// Jalankan pengecekan sekali saat aplikasi baru dibuka
 checkConnectionStatus();

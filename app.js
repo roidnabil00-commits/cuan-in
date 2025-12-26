@@ -76,7 +76,7 @@ async function init() {
         .eq('store_id', storeId)
         .eq('user_id', user.id)
         .eq('status', 'open')
-        .single();
+        .maybeSingle();
     
     if(shift) {
         shiftId = shift.id;

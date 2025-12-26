@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Cuan-in SaaS</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Library QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -127,14 +129,19 @@
         .btn-page { background: var(--accent); color: white; padding: 8px 15px; font-size: 12px; border-radius: 5px; }
         .btn-page:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        /* Tag untuk selisih uang */
         .badge-diff { padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; display: inline-block; }
         .diff-plus { background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid #00ff88; }
         .diff-minus { background: rgba(233, 69, 96, 0.2); color: #e94560; border: 1px solid #e94560; }
         .diff-pas { background: rgba(255, 255, 255, 0.1); color: #aaa; border: 1px solid #555; }
-
-        /* Tag Varian */
         .variant-tag { background: #0f3460; padding: 2px 6px; border-radius: 4px; font-size: 10px; color: #ccc; margin-right: 4px; display: inline-block; margin-top: 2px; }
+
+        /* QR Print Area */
+        #qr-print-area { display: none; background: white; padding: 20px; text-align: center; color: black; }
+        @media print {
+            body * { visibility: hidden; }
+            #qr-print-area, #qr-print-area * { visibility: visible; }
+            #qr-print-area { display: block; position: absolute; left: 0; top: 0; width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -148,6 +155,8 @@
         <div class="menu-item active" onclick="navTo('dashboard', this)">Dashboard</div>
         <div class="menu-item" onclick="navTo('shift-mgr', this)">Laporan Shift</div>
         <div class="menu-item" onclick="navTo('menu-mgr', this)">Kelola Menu</div>
+        <!-- MENU BARU: KELOLA MEJA -->
+        <div class="menu-item" onclick="navTo('table-mgr', this)">Kelola Meja (QR)</div>
         <div class="menu-item" onclick="navTo('trx-mgr', this)">Riwayat</div>
         <div class="menu-item" onclick="window.location.href='laporan.html'">Laporan Detail</div>
         <div class="menu-item" onclick="window.location.href='dapur.html'">Layar Dapur</div>
@@ -180,17 +189,8 @@
             <h1>Laporan Shift & Kasir</h1>
             <p style="color:#aaa; font-size:13px; margin-bottom:15px;">Pantau uang kas fisik (laci) vs sistem saat kasir tutup toko.</p>
             <div class="panel">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Waktu Tutup</th>
-                            <th>Staff</th>
-                            <th>Modal Awal</th>
-                            <th>Sistem (Harusnya)</th>
-                            <th>Fisik (Aktual)</th>
-                            <th>Selisih</th>
-                        </tr>
-                    </thead>
+                <table id="tabel-shift-container">
+                    <thead><tr><th>Waktu Tutup</th><th>Staff</th><th>Modal Awal</th><th>Sistem</th><th>Fisik</th><th>Selisih</th></tr></thead>
                     <tbody id="tabel-shift"></tbody>
                 </table>
             </div>
@@ -200,7 +200,6 @@
             <h1>Kelola Menu</h1>
             <div class="panel">
                 <input type="hidden" id="menu-id"> 
-                
                 <div class="row">
                     <input type="text" id="nama" placeholder="Nama Menu" class="half">
                     <div class="half" style="display:flex; gap:5px;">
@@ -208,46 +207,54 @@
                         <input type="text" id="harga" placeholder="Harga Jual" onkeyup="formatRupiah(this)" style="flex:1;">
                     </div>
                 </div>
-
+                <!-- Tambahan Deskripsi untuk Menu Online -->
+                <textarea id="deskripsi" rows="2" placeholder="Deskripsi Menu (Untuk tampilan di QR Code pelanggan)" style="margin-bottom:10px;"></textarea>
+                
                 <div class="row">
                     <input type="number" id="stok" placeholder="Stok" class="half">
                     <input type="number" id="diskon" placeholder="Diskon (%)" class="half" min="0" max="100">
                 </div>
-
                 <select id="kategori">
                     <option value="Coffee">Coffee</option>
                     <option value="Non-Coffee">Non-Coffee</option>
                     <option value="Makanan">Makanan</option>
                     <option value="Snack">Snack</option>
                 </select>
-
                 <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px dashed #555;">
                     <label style="font-size:12px; color:#aaa; display:block; margin-bottom:5px;">Varian / Topping (Opsional)</label>
-                    <input type="text" id="varian-str" placeholder="Contoh: Es:2000, Panas:0 (Format: Nama:TambahanHarga)" style="margin-bottom:5px;">
-                    <small style="color:#888; font-size:10px;">Pisahkan dengan koma. Jika kosong berarti tidak ada varian.</small>
+                    <input type="text" id="varian-str" placeholder="Contoh: Es:2000, Panas:0" style="margin-bottom:5px;">
                 </div>
-
                 <div style="margin-top:10px;">
                     <button class="btn-primary" id="btn-simpan-menu">SIMPAN MENU</button>
                     <button id="btn-batal" style="background:#555; color:white; display:none;" onclick="resetForm()">BATAL</button>
                 </div>
             </div>
-
             <div class="panel">
-                <table>
-                    <thead><tr><th>Produk</th><th>Varian</th><th>Harga</th><th>Stok</th><th>Aksi</th></tr></thead>
-                    <tbody id="tabel-menu"></tbody>
-                </table>
+                <table><thead><tr><th>Produk</th><th>Varian</th><th>Harga</th><th>Stok</th><th>Aksi</th></tr></thead><tbody id="tabel-menu"></tbody></table>
+            </div>
+        </div>
+
+        <!-- SECTION BARU: KELOLA MEJA -->
+        <div id="table-mgr" class="section">
+            <h1>Kelola Meja & QR Code</h1>
+            <p style="color:#aaa; font-size:13px; margin-bottom:15px;">Generate QR Code unik untuk setiap meja.</p>
+            
+            <div class="panel">
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="table-number-input" placeholder="Nomor Meja (Contoh: Meja 12)" style="flex:2;">
+                    <button class="btn-primary" onclick="addTable()" style="flex:1;">+ TAMBAH MEJA</button>
+                </div>
+            </div>
+
+            <div class="grid-stats" id="tables-container" style="grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));">
+                <!-- Meja Cards will go here -->
             </div>
         </div>
 
         <div id="trx-mgr" class="section">
             <h1>Riwayat Transaksi</h1>
             <div class="panel">
-                <table>
-                    <thead><tr><th>Waktu</th><th>Order ID</th><th>Kasir</th><th>Total</th><th>Status</th></tr></thead>
-                    <tbody id="tabel-transaksi"></tbody>
-                </table>
+                <table><thead><tr><th>Waktu</th><th>Order ID</th><th>Kasir</th><th>Total</th><th>Status</th></tr></thead><tbody id="tabel-transaksi"></tbody></table>
                 <div class="pagination">
                     <button class="btn-page" id="prev-btn" onclick="changeTrxPage(-1)">Previous</button>
                     <span style="font-size:12px; color:#aaa;">Halaman <span id="curr-page" style="color:white; font-weight:bold;">1</span></span>
@@ -266,6 +273,14 @@
                 <button class="btn-primary" onclick="saveSettings()">SIMPAN PENGATURAN</button>
             </div>
         </div>
+    </div>
+
+    <!-- Hidden area for printing QR -->
+    <div id="qr-print-area">
+        <h2 id="print-table-name" style="margin-bottom:10px;">MEJA 1</h2>
+        <div id="print-qr-code" style="display:flex; justify-content:center; margin:20px 0;"></div>
+        <p>Scan untuk memesan menu</p>
+        <small style="color:#555;">Powered by Cuan-in</small>
     </div>
 
     <script type="module">
@@ -290,7 +305,8 @@
             if(sectionId === 'settings') loadSettings();
             if(sectionId === 'trx-mgr') { trxPage = 1; loadTrx(); }
             if(sectionId === 'menu-mgr') loadMenu();
-            if(sectionId === 'shift-mgr') loadShifts(); 
+            if(sectionId === 'shift-mgr') loadShifts();
+            if(sectionId === 'table-mgr') loadTables(); // Load Meja
         };
 
         window.toggleSidebar = () => {
@@ -300,10 +316,7 @@
         // --- AUTH ---
         async function checkSession() {
             const { data: { session } } = await auth.getSession();
-            if (!session) {
-                window.location.href = "login.html";
-                return;
-            }
+            if (!session) { window.location.href = "login.html"; return; }
             const { data: profile } = await db.from('profiles').select('role').eq('id', session.user.id).single();
             if (!profile || profile.role !== 'owner') {
                 alert("⛔ Akses Ditolak! Halaman ini khusus Owner.");
@@ -314,52 +327,33 @@
 
         window.logout = async () => { 
             if(confirm("Keluar dari Admin?")) {
-                await auth.signOut();
-                localStorage.removeItem('user_role');
-                window.location.href = "login.html"; 
+                await auth.signOut(); localStorage.removeItem('user_role'); window.location.href = "login.html"; 
             }
         };
 
-        // --- HELPER ---
-        // --- HELPER (UPDATED) ---
         window.formatRupiah = (el) => {
-            // Hapus semua karakter non-digit agar format bersih
             let val = el.value.replace(/\D/g, '');
-            // Format kembali jadi Rupiah visual (contoh: 10.000)
             el.value = val ? new Intl.NumberFormat('id-ID').format(val) : '';
         };
 
-        // FUNGSI PERBAIKAN: Pastikan data ke DB adalah Integer Murni
         const cleanNum = (v) => {
             if (!v) return 0;
-            // 1. Paksa ubah ke String
-            // 2. Regex /\D/g akan menghapus SEMUA huruf, titik, koma, simbol, spasi
-            const cleanString = String(v).replace(/\D/g, '');
-            // 3. Parse ke Integer (basis 10) agar pasti jadi angka bulat
-            return parseInt(cleanString || 0, 10);
+            return parseInt(String(v).replace(/\D/g, '') || 0, 10);
         };
 
-        // --- DASHBOARD ---
-        // --- DASHBOARD (FIX TIMEZONE) ---
+        // --- DASHBOARD & CHARTS ---
         function loadDashboard() {
-            // 1. Ambil Tanggal Hari Ini versi Jakarta (YYYY-MM-DD)
-            // Trik: Tambahkan jam 00:00:00+07:00 agar Supabase paham ini start hari Jakarta
             const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
-            const todayISO = `${todayStr}T00:00:00+07:00`; // Format ISO dengan Offset WIB
+            const todayISO = `${todayStr}T00:00:00+07:00`; 
 
-            db.from('orders')
-              .select('created_at, grand_total')
-              .gte('created_at', todayISO) // Filter mulai dari jam 00:00 WIB
-              .order('created_at', {ascending:true})
+            db.from('orders').select('created_at, grand_total').gte('created_at', todayISO).order('created_at', {ascending:true})
             .then(({ data }) => {
                 if(!data) return;
                 let omzet = 0, salesMap = {};
                 data.forEach(d => {
                     omzet += d.grand_total;
-                    // Konversi jam transaksi ke WIB buat Grafik
                     const dateObj = new Date(d.created_at);
                     const localHour = dateObj.toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit' }) + ":00";
-                    
                     salesMap[localHour] = (salesMap[localHour]||0) + d.grand_total;
                 });
                 document.getElementById('dash-omzet').innerText = "Rp " + omzet.toLocaleString('id-ID');
@@ -379,57 +373,79 @@
             });
         }
 
-        // --- SHIFT REPORTS ---
-        async function loadShifts() {
-            const { data: shifts, error } = await db
-                .from('shifts')
-                .select(`*, profiles:user_id ( full_name, email )`)
-                .order('created_at', { ascending: false })
-                .limit(20);
+        // --- TABLE MANAGEMENT (NEW) ---
+        window.loadTables = async () => {
+            const storeId = localStorage.getItem('store_id');
+            const { data } = await db.from('tables').select('*').eq('store_id', storeId).order('id');
+            const container = document.getElementById('tables-container');
+            container.innerHTML = "";
 
-            const tbody = document.getElementById('tabel-shift');
-            tbody.innerHTML = "";
-
-            if(error) return console.error(error);
-            if(!shifts || shifts.length === 0) return tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;'>Belum ada data shift.</td></tr>";
-
-            shifts.forEach(s => {
-                const staffName = s.profiles ? (s.profiles.full_name || s.profiles.email) : 'Unknown';
-                const endTime = s.end_time ? new Date(s.end_time).toLocaleString('id-ID') : '<span style="color:#f6ad55">Sedang Aktif</span>';
+            if(data) data.forEach(t => {
+                // Link Menu URL: Ganti 'menu.html' dengan nama file menu kamu nanti
+                // Format: https://domain.com/menu.html?q=UUID
+                const menuUrl = `${window.location.origin}/menu.html?q=${t.qr_uuid}`;
                 
-                const start = Number(s.start_cash || 0);
-                const expected = Number(s.expected_cash || 0);
-                const end = Number(s.end_cash || 0);
-                
-                const diff = end - expected;
-                const cleanDiff = Math.round(diff); 
-
-                let selisihHtml = "-";
-                
-                if (s.status === 'closed') {
-                    if (cleanDiff === 0) {
-                        selisihHtml = `<span class="badge-diff diff-pas">✅ Pas (Aman)</span>`;
-                    } else if (cleanDiff < 0) {
-                        selisihHtml = `<span class="badge-diff diff-minus">Kurang Rp ${Math.abs(cleanDiff).toLocaleString('id-ID')}</span>`;
-                    } else {
-                        selisihHtml = `<span class="badge-diff diff-plus">Lebih +Rp ${cleanDiff.toLocaleString('id-ID')}</span>`;
-                    }
-                }
-
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${endTime}</td>
-                        <td>${staffName}</td>
-                        <td>Rp ${start.toLocaleString('id-ID')}</td>
-                        <td>Rp ${expected.toLocaleString('id-ID')}</td>
-                        <td>${s.end_cash ? "Rp " + end.toLocaleString('id-ID') : '-'}</td>
-                        <td>${selisihHtml}</td>
-                    </tr>
+                container.innerHTML += `
+                    <div class="card-stat" style="display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <div class="stat-label">MEJA</div>
+                            <div class="stat-val" style="font-size:20px;">${t.table_number}</div>
+                            <div style="font-size:10px; color:#aaa; margin-top:5px;">UUID: ${t.qr_uuid.slice(0,8)}...</div>
+                        </div>
+                        <div style="margin-top:15px; display:flex; gap:5px;">
+                            <button onclick="printQR('${t.table_number}', '${menuUrl}')" style="flex:1; background:#fff; color:black; font-size:12px;">🖨️ Print QR</button>
+                            <button onclick="deleteTable(${t.id})" style="background:var(--neon); color:white; padding:10px;">🗑️</button>
+                        </div>
+                    </div>
                 `;
             });
-        }
+        };
 
-        // --- CRUD MENU (FIXED VARIAN) ---
+        window.addTable = async () => {
+            const num = document.getElementById('table-number-input').value;
+            const storeId = localStorage.getItem('store_id');
+            if(!num) return alert("Isi nomor meja!");
+
+            const { error } = await db.from('tables').insert({
+                store_id: storeId,
+                table_number: num,
+                status: 'available'
+            });
+
+            if(error) alert("Gagal: " + error.message);
+            else {
+                document.getElementById('table-number-input').value = "";
+                loadTables();
+            }
+        };
+
+        window.deleteTable = async (id) => {
+            if(confirm("Hapus meja ini?")) {
+                await db.from('tables').delete().eq('id', id);
+                loadTables();
+            }
+        };
+
+        window.printQR = (tableName, url) => {
+            const printArea = document.getElementById('print-qr-code');
+            printArea.innerHTML = ""; // Clear old QR
+            
+            document.getElementById('print-table-name').innerText = tableName;
+
+            // Generate QR Code
+            new QRCode(printArea, {
+                text: url,
+                width: 200,
+                height: 200
+            });
+
+            // Delay sedikit biar render QR selesai baru print
+            setTimeout(() => {
+                window.print();
+            }, 500);
+        };
+
+        // --- MENU MANAGEMENT (MODIFIED) ---
         function loadMenu() {
             db.from('products').select('*').order('id', {ascending:true}).then(({ data }) => {
                 const tbody = document.getElementById('tabel-menu'); 
@@ -444,7 +460,6 @@
                         priceDisplay = `<s style="color:#888; font-size:10px;">${priceDisplay}</s><br><b style="color:#e94560;">Rp ${afterDisc.toLocaleString()}</b>`;
                     }
                     
-                    // Render Varian di Tabel
                     let varHtml = '-';
                     if(d.variants && d.variants.length > 0) {
                         varHtml = d.variants.map(v => `<span class="variant-tag">${v.name} (+${v.price})</span>`).join("");
@@ -466,14 +481,12 @@
             });
         }
 
-        // --- UPDATE SCRIPT: EDIT & SIMPAN DENGAN MODAL ---
-
         window.editMenu = (d) => {
             document.getElementById('menu-id').value = d.id;
             document.getElementById('nama').value = d.name;
-            // Load Modal & Harga
             document.getElementById('modal').value = new Intl.NumberFormat('id-ID').format(d.cost_price || 0);
             document.getElementById('harga').value = new Intl.NumberFormat('id-ID').format(d.price);
+            document.getElementById('deskripsi').value = d.description || ""; // Edit Deskripsi
             
             document.getElementById('stok').value = d.stock;
             document.getElementById('diskon').value = d.discount_percent || 0; 
@@ -491,8 +504,8 @@
 
         window.resetForm = () => {
             document.getElementById('menu-id').value = ""; document.getElementById('nama').value = "";
-            document.getElementById('modal').value = ""; document.getElementById('harga').value = ""; // Reset Modal
-            document.getElementById('stok').value = "";
+            document.getElementById('modal').value = ""; document.getElementById('harga').value = "";
+            document.getElementById('stok').value = ""; document.getElementById('deskripsi').value = "";
             document.getElementById('diskon').value = ""; document.getElementById('varian-str').value = ""; 
             document.getElementById('btn-simpan-menu').innerText = "SIMPAN MENU";
             document.getElementById('btn-batal').style.display = "none";
@@ -515,11 +528,12 @@
             const p = {
                 store_id: currentStoreId,
                 name: document.getElementById('nama').value,
-                cost_price: cleanNum(document.getElementById('modal').value), // Simpan Modal
+                cost_price: cleanNum(document.getElementById('modal').value),
                 price: cleanNum(document.getElementById('harga').value),
                 stock: Number(document.getElementById('stok').value),
                 discount_percent: Number(document.getElementById('diskon').value),
                 category: document.getElementById('kategori').value,
+                description: document.getElementById('deskripsi').value, // Simpan Deskripsi
                 variants: variants
             };
 
@@ -537,15 +551,32 @@
             }
         });
 
-        // --- RIWAYAT (UPDATE DENGAN NAMA KASIR) ---
-        window.changeTrxPage = (delta) => { trxPage += delta; loadTrx(); };
+        // --- SHIFT & RIWAYAT ---
+        async function loadShifts() {
+            const { data: shifts } = await db.from('shifts').select(`*, profiles:user_id ( full_name, email )`).order('created_at', { ascending: false }).limit(20);
+            const tbody = document.getElementById('tabel-shift'); tbody.innerHTML = "";
+            if(!shifts || shifts.length === 0) return tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;'>Belum ada data shift.</td></tr>";
 
+            shifts.forEach(s => {
+                const staffName = s.profiles ? (s.profiles.full_name || s.profiles.email) : 'Unknown';
+                const endTime = s.end_time ? new Date(s.end_time).toLocaleString('id-ID') : '<span style="color:#f6ad55">Sedang Aktif</span>';
+                const start = Number(s.start_cash || 0); const expected = Number(s.expected_cash || 0); const end = Number(s.end_cash || 0);
+                const diff = end - expected;
+                let selisihHtml = "-";
+                if (s.status === 'closed') {
+                    if (Math.round(diff) === 0) selisihHtml = `<span class="badge-diff diff-pas">✅ Pas</span>`;
+                    else if (diff < 0) selisihHtml = `<span class="badge-diff diff-minus">Kurang Rp ${Math.abs(diff).toLocaleString('id-ID')}</span>`;
+                    else selisihHtml = `<span class="badge-diff diff-plus">Lebih +Rp ${diff.toLocaleString('id-ID')}</span>`;
+                }
+                tbody.innerHTML += `<tr><td>${endTime}</td><td>${staffName}</td><td>Rp ${start.toLocaleString('id-ID')}</td><td>Rp ${expected.toLocaleString('id-ID')}</td><td>${s.end_cash ? "Rp " + end.toLocaleString('id-ID') : '-'}</td><td>${selisihHtml}</td></tr>`;
+            });
+        }
+
+        window.changeTrxPage = (delta) => { trxPage += delta; loadTrx(); };
         async function loadTrx() {
-            const from = (trxPage - 1) * trxLimit;
-            const to = from + trxLimit - 1;
+            const from = (trxPage - 1) * trxLimit; const to = from + trxLimit - 1;
             const { data } = await db.from('orders').select('*').order('created_at', {ascending:false}).range(from, to);
-            const tbody = document.getElementById('tabel-transaksi'); 
-            tbody.innerHTML = "";
+            const tbody = document.getElementById('tabel-transaksi'); tbody.innerHTML = "";
             if(data) data.forEach(d => tbody.innerHTML += `<tr><td>${new Date(d.created_at).toLocaleTimeString()}</td><td>${d.order_number}</td><td>${d.cashier_name || '-'}</td><td>Rp ${d.grand_total.toLocaleString()}</td><td><span style="background:#00ff88; color:black; padding:2px 8px; border-radius:10px; font-size:10px;">${d.status}</span></td></tr>`);
             document.getElementById('curr-page').innerText = trxPage;
             document.getElementById('prev-btn').disabled = trxPage === 1;

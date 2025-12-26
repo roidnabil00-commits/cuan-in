@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Menu Digital - Cuan-in</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-main: #1a1a2e; --bg-card: #16213e; --text: #ffffff; --accent: #00ff88; --neon: #e94560; --purple: #764ba2; --rounded: 16px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-main); color: var(--text); padding-bottom: 100px; min-height: 100vh; }
+
+        /* HEADER */
+        .header { padding: 20px; position: sticky; top: 0; background: rgba(26, 26, 46, 0.95); backdrop-filter: blur(10px); z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .table-badge { background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px; font-size: 12px; display: flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,0.2); }
+        .status-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 5px var(--accent); }
+
+        /* KATEGORI */
+        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 10px 20px; scrollbar-width: none; }
+        .cat-chip { background: var(--bg-card); padding: 8px 16px; border-radius: 20px; font-size: 13px; color: #aaa; white-space: nowrap; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; cursor: pointer; }
+        .cat-chip.active { background: var(--purple); color: white; border-color: var(--purple); box-shadow: 0 4px 10px rgba(118, 75, 162, 0.4); }
+
+        /* MENU GRID */
+        .menu-grid { display: grid; grid-template-columns: 1fr; gap: 15px; padding: 20px; }
+        .menu-card { background: var(--bg-card); border-radius: var(--rounded); padding: 15px; display: flex; gap: 15px; border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden; }
+        .menu-img { width: 80px; height: 80px; background: #0f0f1a; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+        .menu-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .menu-name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+        .menu-desc { font-size: 11px; color: #888; margin-bottom: 8px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .menu-price { color: var(--accent); font-weight: 700; font-size: 14px; }
+        
+        .btn-add { position: absolute; bottom: 15px; right: 15px; background: var(--bg-main); border: 1px solid var(--accent); color: var(--accent); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: 0.2s; }
+        .btn-add:active { background: var(--accent); color: black; transform: scale(0.9); }
+
+        /* FLOATING UI */
+        .floating-ai { position: fixed; bottom: 100px; right: 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 5px 20px rgba(118, 75, 162, 0.5); z-index: 90; cursor: pointer; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #1a1a2e; border-top: 1px solid rgba(255,255,255,0.1); padding: 15px 20px; z-index: 100; display: none; justify-content: space-between; align-items: center; box-shadow: 0 -5px 20px rgba(0,0,0,0.5); }
+        .bottom-nav.active { display: flex; }
+        .btn-checkout { background: var(--accent); color: black; font-weight: 700; padding: 12px 25px; border-radius: 12px; border: none; font-size: 14px; flex: 1; margin-left: 15px; cursor: pointer; }
+
+        /* MODAL AI & CART */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; align-items: flex-end; backdrop-filter: blur(3px); }
+        .modal-content { background: #1e1e2d; width: 100%; border-radius: 25px 25px 0 0; padding: 25px; max-height: 80vh; overflow-y: auto; position: relative; animation: slideUp 0.3s; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        /* AI CHAT */
+        .chat-box { height: 300px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05); border-radius: 15px; padding: 15px; margin-bottom: 15px; background: rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 8px 12px; border-radius: 10px; font-size: 13px; max-width: 80%; }
+        .msg.bot { background: var(--bg-card); color: #ccc; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
+        .msg.user { background: var(--purple); color: white; align-self: flex-end; }
+        .input-area { display: flex; gap: 10px; }
+        .ai-input { flex: 1; background: #111; border: none; padding: 12px; border-radius: 10px; color: white; outline: none; }
+
+        /* LOADING */
+        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- LOADING -->
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <p style="margin-top:15px; font-size:12px; color:#aaa;">Memuat Menu...</p>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-container" style="display:none;">
+        <div class="header">
+            <div>
+                <h2 style="font-size:18px; font-weight:700; color:white;">Cuan-in</h2>
+                <div style="font-size:10px; color:#aaa;" id="store-name-display">Loading...</div>
+            </div>
+            <div class="table-badge">
+                <div class="status-dot"></div>
+                <span id="table-num-display">...</span>
+            </div>
+        </div>
+
+        <div class="categories" id="cat-container">
+            <!-- Inject JS -->
+        </div>
+
+        <div class="menu-grid" id="menu-container">
+            <!-- Inject JS -->
+        </div>
+
+        <!-- WAITERS AI BUTTON -->
+        <div class="floating-ai" onclick="openAI()">🤖</div>
+
+        <!-- CART BAR -->
+        <div class="bottom-nav" id="cart-bar">
+            <div>
+                <div style="font-size:11px; color:#aaa;">Total Pesanan</div>
+                <div style="font-size:16px; font-weight:700; color:var(--accent);" id="total-price-display">Rp 0</div>
+            </div>
+            <button class="btn-checkout" onclick="checkout()">PESAN SEKARANG (<span id="cart-count">0</span>)</button>
+        </div>
+    </div>
+
+    <!-- MODAL AI -->
+    <div id="modal-ai" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom:15px; display:flex; justify-content:space-between;">
+                🤖 Waiters AI 
+                <span style="font-size:12px; color:#aaa; font-weight:400;">BETA</span>
+                <span onclick="document.getElementById('modal-ai').style.display='none'" style="cursor:pointer;">✕</span>
+            </h3>
+            <div class="chat-box" id="ai-chat">
+                <div class="msg bot">Halo! Bingung mau pesan apa? Tanya aku ya! (Contoh: "Rekomendasi kopi manis")</div>
+            </div>
+            <div class="input-area">
+                <input type="text" id="ai-input" class="ai-input" placeholder="Tanya menu..." onkeypress="handleEnter(event)">
+                <button onclick="sendAI()" style="background:var(--accent); border:none; width:40px; border-radius:10px; cursor:pointer;">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script type="module">
+        // --- INTEGRASI SUPABASE (INLINED) ---
+        // Menggabungkan db-config.js ke sini agar tidak error modul relative path
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        // Konfigurasi Supabase
+        const supabaseUrl = 'https://anftjwlvwslsndjxwyij.supabase.co'; 
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFuZnRqd2x2d3Nsc25kanh3eWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NjY3NjcsImV4cCI6MjA4MTQ0Mjc2N30.fIAKkktcun45-AqoHauuER8TcQI_H1NWgNN93elC9aA'; 
+        
+        // Inisialisasi
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const db = supabase; 
+        // --- END INTEGRASI ---
+
+        // --- STATE ---
+        let currentStoreId = null;
+        let currentTableId = null;
+        let products = [];
+        let cart = [];
+        
+        // 1. INIT: AMBIL PARAMETER QR
+        async function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const qrUuid = urlParams.get('q'); // UUID dari QR Code
+
+            if(!qrUuid) {
+                // Untuk testing tanpa QR, kita bisa bypass (Opsional)
+                // alert("❌ QR Code tidak valid! Mohon scan ulang.");
+                // return;
+                console.warn("Mode Tanpa QR: Menggunakan data dummy/kosong");
+            }
+
+            try {
+                // A. Validasi Meja (Hanya jalan jika ada QR UUID)
+                if (qrUuid) {
+                    const { data: tableData, error } = await db.from('tables')
+                        .select('*, stores(name)')
+                        .eq('qr_uuid', qrUuid)
+                        .single();
+
+                    if(error || !tableData) throw new Error("Meja tidak ditemukan");
+
+                    currentStoreId = tableData.store_id;
+                    currentTableId = tableData.id;
+
+                    // Update UI Header
+                    document.getElementById('table-num-display').innerText = tableData.table_number;
+                    document.getElementById('store-name-display').innerText = tableData.stores?.name || "Resto";
+                } else {
+                    // Fallback jika dibuka langsung tanpa QR (Testing)
+                    // Ambil toko pertama yg ditemukan
+                    // const { data: store } = await db.from('stores').select('id, name').limit(1).single();
+                    // if(store) {
+                    //     currentStoreId = store.id;
+                    //     document.getElementById('store-name-display').innerText = store.name + " (Test Mode)";
+                    // }
+                    // Jika mode produksi, harusnya return error
+                }
+
+                // B. Ambil Menu
+                // Pastikan currentStoreId ada (dari QR atau fallback)
+                if (currentStoreId) {
+                    const { data: menuData } = await db.from('products')
+                        .select('*')
+                        .eq('store_id', currentStoreId)
+                        .eq('stock', 0, { negate: true }) 
+                        .gt('stock', 0) // Filter Stok > 0
+                        .order('category');
+                    products = menuData || [];
+                } else {
+                    // Jika tidak ada store ID (misal user buka file langsung tanpa ?q=...), kosongkan
+                     products = [];
+                }
+
+                renderMenu('all');
+                renderCategories();
+
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('app-container').style.display = 'block';
+
+            } catch (err) {
+                alert("Gagal memuat: " + err.message);
+                document.getElementById('loading-screen').innerHTML = `<p style="color:red">${err.message}</p>`;
+            }
+        }
+
+        // 2. RENDER KATEGORI
+        function renderCategories() {
+            const cats = ['all', ...new Set(products.map(p => p.category))];
+            const container = document.getElementById('cat-container');
+            container.innerHTML = cats.map(c => 
+                `<div class="cat-chip ${c==='all'?'active':''}" onclick="filterCat('${c}', this)">${c.toUpperCase()}</div>`
+            ).join('');
+        }
+
+        window.filterCat = (cat, el) => {
+            document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            renderMenu(cat);
+        };
+
+        // 3. RENDER MENU GRID
+        function renderMenu(cat) {
+            const container = document.getElementById('menu-container');
+            const filtered = cat === 'all' ? products : products.filter(p => p.category === cat);
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `<div style="text-align:center; grid-column:1/-1; color:#aaa; padding:50px;">Menu tidak tersedia atau belum dimuat.</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(p => {
+                // Placeholder image jika null
+                const img = p.image_url || 'https://via.placeholder.com/150/16213e/ffffff?text=MENU'; 
+                return `
+                <div class="menu-card">
+                    <img src="${img}" class="menu-img">
+                    <div class="menu-info">
+                        <div class="menu-name">${p.name}</div>
+                        <div class="menu-desc">${p.description || 'Tidak ada deskripsi.'}</div>
+                        <div class="menu-price">Rp ${p.price.toLocaleString()}</div>
+                    </div>
+                    <div class="btn-add" onclick="addToCart(${p.id})">+</div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        // 4. CART LOGIC
+        window.addToCart = (id) => {
+            const p = products.find(x => x.id === id);
+            cart.push(p);
+            updateCartUI();
+            
+            // Animasi getar kecil di HP
+            if(navigator.vibrate) navigator.vibrate(50); 
+        };
+
+        function updateCartUI() {
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
+            document.getElementById('total-price-display').innerText = "Rp " + total.toLocaleString();
+            document.getElementById('cart-count').innerText = cart.length;
+            
+            const bar = document.getElementById('cart-bar');
+            if(cart.length > 0) bar.classList.add('active');
+            else bar.classList.remove('active');
+        }
+
+        // 5. CHECKOUT (Kirim ke Dapur)
+        window.checkout = async () => {
+            if(cart.length === 0) return;
+            if(!confirm(`Pesan ${cart.length} item seharga Rp ${cart.reduce((a,b)=>a+b.price,0).toLocaleString()}?`)) return;
+
+            const btn = document.querySelector('.btn-checkout');
+            btn.innerText = "Memproses...";
+            btn.disabled = true;
+
+            try {
+                // Grouping items logic could be here, but for now simple insert
+                // Kita butuh insert ke 'orders' dulu
+                const grandTotal = cart.reduce((sum, item) => sum + item.price, 0);
+                
+                // 1. Buat Order Header
+                const { data: order, error } = await db.from('orders').insert({
+                    store_id: currentStoreId,
+                    table_id: currentTableId,
+                    table_number: document.getElementById('table-num-display').innerText,
+                    customer_name: "Self Service", // Bisa dibuat input nama kalau mau
+                    grand_total: grandTotal,
+                    subtotal: grandTotal,
+                    order_source: 'self_service',
+                    status: 'unpaid', // Masuk ke kasir sebagai unpaid
+                    payment_method: 'PENDING'
+                }).select().single();
+
+                if(error) throw error;
+
+                // 2. Buat Order Items
+                // Kita perlu format array item sesuai struktur tabel order_items
+                // Agregasi item yang sama
+                const itemMap = {};
+                cart.forEach(p => {
+                    if(!itemMap[p.id]) itemMap[p.id] = { ...p, qty: 0 };
+                    itemMap[p.id].qty++;
+                });
+
+                const orderItemsPayload = Object.values(itemMap).map(p => ({
+                    order_id: order.id,
+                    product_id: p.id,
+                    product_name: p.name,
+                    price: p.price,
+                    qty: p.qty,
+                    subtotal: p.price * p.qty
+                }));
+
+                await db.from('order_items').insert(orderItemsPayload);
+
+                alert("✅ Pesanan Berhasil! Mohon tunggu, pesanan sudah masuk ke dapur.");
+                cart = [];
+                updateCartUI();
+                btn.innerText = "PESAN SEKARANG";
+                btn.disabled = false;
+                // Optional: Redirect ke halaman 'waiting' atau status pesanan
+
+            } catch (err) {
+                alert("Gagal order: " + err.message);
+                btn.innerText = "COBA LAGI";
+                btn.disabled = false;
+            }
+        };
+
+        // 6. WAITERS AI (SIMPLE KEYWORD MATCHING)
+        window.openAI = () => document.getElementById('modal-ai').style.display = 'flex';
+        window.handleEnter = (e) => { if(e.key === 'Enter') sendAI(); };
+
+        window.sendAI = () => {
+            const input = document.getElementById('ai-input');
+            const q = input.value.toLowerCase();
+            const chat = document.getElementById('ai-chat');
+            
+            if(!q) return;
+
+            // User msg
+            chat.innerHTML += `<div class="msg user">${input.value}</div>`;
+            input.value = "";
+            chat.scrollTop = chat.scrollHeight;
+
+            // Simulate Thinking
+            setTimeout(() => {
+                let reply = "Maaf, aku kurang paham. Coba tanya 'rekomendasi kopi' atau 'makanan pedas'.";
+                
+                // Simple Logic (Bisa diganti LLM beneran nanti)
+                const matched = products.filter(p => 
+                    p.name.toLowerCase().includes(q) || 
+                    (p.description && p.description.toLowerCase().includes(q)) ||
+                    (p.category.toLowerCase().includes(q))
+                );
+
+                if (matched.length > 0) {
+                    const pick = matched[Math.floor(Math.random() * matched.length)];
+                    reply = `Aku sarankan coba <b>${pick.name}</b> (Rp ${pick.price.toLocaleString()}). ${pick.description || ''}`;
+                } else if (q.includes('halo') || q.includes('hi')) {
+                    reply = "Halo kak! Mau pesan apa hari ini?";
+                }
+
+                chat.innerHTML += `<div class="msg bot">${reply}</div>`;
+                chat.scrollTop = chat.scrollHeight;
+            }, 800);
+        };
+
+        // Start
+        init();
+    </script>
+</body>
+</html>

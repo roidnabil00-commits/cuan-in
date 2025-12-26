@@ -8,7 +8,6 @@ const urlsToCache = [
   '/dapur.html',
   '/app.js',
   '/db-config.js',
-  '/style.css',
   '/manifest.json',
   '/qris.jpg',
   '/icon.png', // <--- TAMBAHKAN INI

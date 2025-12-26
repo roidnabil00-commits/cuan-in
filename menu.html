@@ -79,13 +79,24 @@
         .modal-title { font-size: 18px; font-weight: 700; }
         .btn-back { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
 
-        /* VARIANTS */
-        .variant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .variant-btn { 
-            background: #1a1a1a; border: 1px solid #333; padding: 15px; border-radius: 10px; 
-            color: white; font-size: 13px; cursor: pointer; text-align: center;
+        /* --- VARIANTS UI (DIPERBAIKI LEBIH RAPI) --- */
+        .variant-list-container { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .variant-option { 
+            background: #252525; 
+            border: 1px solid #333; 
+            padding: 15px; 
+            border-radius: 12px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            cursor: pointer;
+            transition: 0.2s;
         }
-        .variant-btn:hover { border-color: var(--primary); }
+        .variant-option:active { background: #333; transform: scale(0.98); }
+        .variant-option:hover { border-color: var(--primary); }
+        
+        .variant-name { font-weight: 600; font-size: 14px; color: white; }
+        .variant-price { font-size: 13px; color: var(--accent); font-weight: bold; }
 
         /* INPUTS & NOTES */
         .form-group { margin-bottom: 15px; }
@@ -100,7 +111,7 @@
         .note-input::placeholder { color: #555; }
         .note-input:focus { border-bottom-color: var(--accent); }
 
-        /* QTY CONTROL (NEW) */
+        /* QTY CONTROL */
         .qty-control { display: flex; align-items: center; gap: 10px; background: #222; border-radius: 8px; padding: 2px; }
         .btn-qty { 
             width: 25px; height: 25px; border: none; border-radius: 6px; 
@@ -145,11 +156,15 @@
     </div>
 
     <div id="modal-variant" class="modal" style="justify-content:center; align-items:center; display:none;">
-        <div style="background:#1a1a1a; padding:20px; border-radius:15px; width:90%; max-width:400px; position:relative; top:20%;">
-            <h3 id="var-title" style="margin-bottom:5px;">Pilih Varian</h3>
-            <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Pilih salah satu varian untuk menu ini.</p>
-            <div id="var-list" class="variant-grid"></div>
-            <button onclick="closeModal('modal-variant')" style="width:100%; padding:12px; background:#333; color:white; border:none; border-radius:10px; margin-top:15px;">Batal</button>
+        <div style="background:#1a1a1a; padding:25px; border-radius:20px; width:90%; max-width:400px; position:relative; top:10%; border:1px solid rgba(255,255,255,0.1);">
+            <div style="text-align:center; margin-bottom:20px;">
+                <h3 id="var-title" style="margin-bottom:5px; font-size:18px;">Pilih Varian</h3>
+                <p style="font-size:12px; color:#aaa;">Sesuaikan pesananmu</p>
+            </div>
+            
+            <div id="var-list" class="variant-list-container"></div>
+
+            <button onclick="closeModal('modal-variant')" style="width:100%; padding:15px; background:transparent; color:#aaa; border:none; margin-top:15px; font-size:12px;">BATAL</button>
         </div>
     </div>
 
@@ -320,18 +335,23 @@
             `}).join('');
         }
 
+        // --- PERBAIKAN LOGIC & UI VARIAN ---
         window.checkVariant = (p) => {
             if (typeof p === 'string') p = JSON.parse(p); 
+            
             if (p.variants && p.variants.length > 0) {
                 tempSelectedProduct = p;
                 document.getElementById('var-title').innerText = p.name;
                 const vList = document.getElementById('var-list');
+                
+                // RENDER LIST YANG RAPI (Perbaikan UI)
                 vList.innerHTML = p.variants.map((v, i) => `
-                    <div class="variant-btn" onclick="selectVariant(${i})">
-                        <div style="font-weight:bold;">${v.name}</div>
-                        <div style="font-size:11px; color:#aaa;">+ Rp ${v.price.toLocaleString()}</div>
+                    <div class="variant-option" onclick="selectVariant(${i})">
+                        <div class="variant-name">${v.name}</div>
+                        <div class="variant-price">+ Rp ${Number(v.price).toLocaleString()}</div>
                     </div>
                 `).join('');
+                
                 document.getElementById('modal-variant').style.display = 'flex';
             } else {
                 addToCart(p, null);
@@ -344,8 +364,13 @@
             closeModal('modal-variant');
         }
 
+        // --- PERBAIKAN LOGIKA HITUNG HARGA (PAKE NUMBER) ---
         window.addToCart = (p, variant) => {
-            const finalPrice = p.price + (variant ? variant.price : 0);
+            // Pastikan semua jadi Number dulu biar tidak error string concatenation
+            const basePrice = Number(p.price);
+            const varPrice = variant ? Number(variant.price) : 0;
+            
+            const finalPrice = basePrice + varPrice;
             const finalName = p.name + (variant ? ` (${variant.name})` : '');
             const idUnique = p.id + (variant ? '-' + variant.name : '');
 
@@ -357,7 +382,7 @@
                     id: p.id,
                     idUnique: idUnique,
                     name: finalName,
-                    price: finalPrice,
+                    price: finalPrice, // Harga Satuan yang SUDAH DIGABUNG
                     qty: 1,
                     isVariant: !!variant,
                     note: '' 
@@ -377,22 +402,20 @@
             else bar.classList.remove('active');
         }
 
-        // --- NEW: EDIT QTY FUNCTION ---
+        // --- EDIT QTY & HAPUS ---
         window.changeQty = (index, delta) => {
             const item = cart[index];
             item.qty += delta;
 
             if (item.qty <= 0) {
-                // Hapus item jika 0
                 cart.splice(index, 1);
             }
             
-            // Re-render & Update
             updateBar();
             if (cart.length > 0) {
-                goToRincian(); // Refresh modal content
+                goToRincian(); 
             } else {
-                closeModal('page-rincian'); // Tutup modal kalo habis
+                closeModal('page-rincian'); 
             }
         }
 
@@ -425,6 +448,8 @@
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <div style="flex:1;">
                             <div style="font-weight:bold;">${p.name}</div>
+                            <div style="font-size:10px; color:#aaa;">@Rp ${p.price.toLocaleString()}</div>
+                            
                             <div class="qty-control" style="margin-top:5px; width:fit-content;">
                                 <button class="btn-qty btn-minus" onclick="changeQty(${index}, -1)">-</button>
                                 <span class="qty-val">${p.qty}</span>

@@ -43,7 +43,22 @@
 
         /* MODALS (PAYMENT, SHIFT, VARIANT) */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-box { background: var(--bg-secondary); width: 90%; max-width: 400px; padding: 25px; border-radius: 25px; text-align: center; color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .modal-box { 
+    background: var(--bg-secondary); 
+    width: 90%; 
+    max-width: 400px; 
+    padding: 25px; 
+    border-radius: 25px; 
+    text-align: center; 
+    color: white; 
+    border: 1px solid rgba(255,255,255,0.1); 
+    
+    /* --- PERBAIKAN SCROLL --- */
+    max-height: 85vh; /* Batasi tinggi maksimal 85% layar HP */
+    overflow-y: auto; /* Otomatis scroll kalau kepanjangan */
+    display: flex;    /* Biar rapi */
+    flex-direction: column; 
+}
         .btn-method, .var-btn { flex: 1; padding: 12px; background: var(--bg-main); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 12px; cursor: pointer; margin: 5px; }
         .var-btn:hover { background: var(--accent-green); color: black; }
         .modern-input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #444; background: var(--bg-main); outline: none; }

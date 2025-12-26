@@ -11,7 +11,8 @@ const urlsToCache = [
   '/style.css',
   '/manifest.json',
   '/qris.jpg',
-  'https://cdn.jsdelivr.net/npm/chart.js', // Cache library luar juga
+  '/icon.png', // <--- TAMBAHKAN INI
+  'https://cdn.jsdelivr.net/npm/chart.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js' 
 ];
 

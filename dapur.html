@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -102,7 +103,8 @@
         async function loadOrders() {
             const { data: orders, error } = await db.from('orders')
                 .select(`*, order_items(*)`)
-                .eq('status', 'paid')
+                .neq('status', 'served')
+                .neq('status', 'cancelled')
                 .order('created_at', { ascending: true }); // FIFO (First In First Out)
             
             if(error) return console.error("Gagal load:", error);

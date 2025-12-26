@@ -5,373 +5,543 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Menu Digital - Cuan-in</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/lucide@latest"></script> 
+    
     <style>
-        :root { --bg-main: #1a1a2e; --bg-card: #16213e; --text: #ffffff; --accent: #00ff88; --neon: #e94560; --purple: #764ba2; --rounded: 16px; }
+        /* --- TEMA NEON DARK (SESUAI PDF) --- */
+        :root { 
+            --bg-main: #000000; 
+            --bg-card: #141414; 
+            --primary: #8A2BE2; /* Ungu Neon */
+            --accent: #00ff88;  /* Hijau Neon */
+            --danger: #ff4757;  /* Merah Hapus */
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --border: rgba(255,255,255,0.1);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-main); color: var(--text); padding-bottom: 100px; min-height: 100vh; }
+        body { background-color: var(--bg-main); color: var(--text-main); padding-bottom: 100px; }
 
-        /* HEADER */
-        .header { padding: 20px; position: sticky; top: 0; background: rgba(26, 26, 46, 0.95); backdrop-filter: blur(10px); z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
-        .table-badge { background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px; font-size: 12px; display: flex; align-items: center; gap: 5px; border: 1px solid rgba(255,255,255,0.2); }
-        .status-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 5px var(--accent); }
-
-        /* KATEGORI */
-        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 10px 20px; scrollbar-width: none; }
-        .cat-chip { background: var(--bg-card); padding: 8px 16px; border-radius: 20px; font-size: 13px; color: #aaa; white-space: nowrap; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; cursor: pointer; }
-        .cat-chip.active { background: var(--purple); color: white; border-color: var(--purple); box-shadow: 0 4px 10px rgba(118, 75, 162, 0.4); }
-
-        /* MENU GRID */
-        .menu-grid { display: grid; grid-template-columns: 1fr; gap: 15px; padding: 20px; }
-        .menu-card { background: var(--bg-card); border-radius: var(--rounded); padding: 15px; display: flex; gap: 15px; border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden; }
-        .menu-img { width: 80px; height: 80px; background: #0f0f1a; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
-        .menu-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-        .menu-name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
-        .menu-desc { font-size: 11px; color: #888; margin-bottom: 8px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .menu-price { color: var(--accent); font-weight: 700; font-size: 14px; }
+        /* UI COMPONENTS */
+        .hero-section {
+            width: 100%; height: 220px;
+            background: url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop') center/cover;
+            position: relative;
+            mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+        }
         
-        .btn-add { position: absolute; bottom: 15px; right: 15px; background: var(--bg-main); border: 1px solid var(--accent); color: var(--accent); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: 0.2s; }
-        .btn-add:active { background: var(--accent); color: black; transform: scale(0.9); }
+        .header-nav {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 50;
+            padding: 20px; display: flex; justify-content: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+        }
+        .table-badge { 
+            background: linear-gradient(90deg, var(--primary), #4b0082); 
+            padding: 8px 20px; border-radius: 30px; 
+            font-weight: 700; font-size: 16px; letter-spacing: 1px;
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            text-transform: uppercase;
+        }
 
-        /* FLOATING UI */
-        .floating-ai { position: fixed; bottom: 100px; right: 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 5px 20px rgba(118, 75, 162, 0.5); z-index: 90; cursor: pointer; animation: bounce 2s infinite; }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        .cat-container { display: flex; gap: 15px; overflow-x: auto; padding: 0 20px; margin-top: -40px; position: relative; z-index: 10; scrollbar-width: none; }
+        .cat-item { background: rgba(20, 20, 20, 0.8); border: 1px solid var(--border); padding: 10px 20px; border-radius: 12px; color: var(--text-muted); font-size: 13px; white-space: nowrap; transition: 0.3s; }
+        .cat-item.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 5px 15px rgba(138, 43, 226, 0.4); }
 
-        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #1a1a2e; border-top: 1px solid rgba(255,255,255,0.1); padding: 15px 20px; z-index: 100; display: none; justify-content: space-between; align-items: center; box-shadow: 0 -5px 20px rgba(0,0,0,0.5); }
-        .bottom-nav.active { display: flex; }
-        .btn-checkout { background: var(--accent); color: black; font-weight: 700; padding: 12px 25px; border-radius: 12px; border: none; font-size: 14px; flex: 1; margin-left: 15px; cursor: pointer; }
+        .menu-section { padding: 25px 20px; }
+        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .menu-card { background: var(--bg-card); border-radius: 15px; overflow: hidden; position: relative; border: 1px solid var(--border); display: flex; flex-direction: column; }
+        .menu-img { width: 100%; height: 130px; object-fit: cover; background: #222; }
+        .menu-body { padding: 12px; flex: 1; display: flex; flex-direction: column; }
+        .menu-name { font-size: 14px; font-weight: 600; margin-bottom: 5px; color: white; }
+        .menu-price { font-size: 14px; font-weight: 700; color: var(--accent); margin-top: auto; }
+        .btn-add { position: absolute; bottom: 10px; right: 10px; width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; }
 
-        /* MODAL AI & CART */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; align-items: flex-end; backdrop-filter: blur(3px); }
-        .modal-content { background: #1e1e2d; width: 100%; border-radius: 25px 25px 0 0; padding: 25px; max-height: 80vh; overflow-y: auto; position: relative; animation: slideUp 0.3s; }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .cart-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: rgba(15, 15, 15, 0.95); backdrop-filter: blur(10px);
+            padding: 15px 20px; border-radius: 25px 25px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+            border-top: 1px solid var(--border); z-index: 100;
+            transform: translateY(120%); transition: 0.3s;
+        }
+        .cart-bar.active { transform: translateY(0); }
+        .btn-checkout { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
-        /* AI CHAT */
-        .chat-box { height: 300px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05); border-radius: 15px; padding: 15px; margin-bottom: 15px; background: rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 10px; }
-        .msg { padding: 8px 12px; border-radius: 10px; font-size: 13px; max-width: 80%; }
-        .msg.bot { background: var(--bg-card); color: #ccc; align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
-        .msg.user { background: var(--purple); color: white; align-self: flex-end; }
-        .input-area { display: flex; gap: 10px; }
-        .ai-input { flex: 1; background: #111; border: none; padding: 12px; border-radius: 10px; color: white; outline: none; }
+        /* MODAL STYLES */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 200; overflow-y: auto; padding: 20px; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from {opacity:0; transform:translateY(20px);} to {opacity:1; transform:translateY(0);} }
+        
+        .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .modal-title { font-size: 18px; font-weight: 700; }
+        .btn-back { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
 
-        /* LOADING */
-        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* VARIANTS */
+        .variant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .variant-btn { 
+            background: #1a1a1a; border: 1px solid #333; padding: 15px; border-radius: 10px; 
+            color: white; font-size: 13px; cursor: pointer; text-align: center;
+        }
+        .variant-btn:hover { border-color: var(--primary); }
+
+        /* INPUTS & NOTES */
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; font-size: 12px; color: #aaa; margin-bottom: 5px; }
+        .form-input { width: 100%; background: #1a1a1a; border: 1px solid #333; color: white; padding: 12px; border-radius: 10px; outline: none; }
+        .form-input:focus { border-color: var(--primary); }
+        
+        .note-input {
+            width: 100%; background: transparent; border: none; border-bottom: 1px solid #333;
+            color: var(--accent); font-size: 12px; padding: 5px 0; outline: none; font-style: italic;
+        }
+        .note-input::placeholder { color: #555; }
+        .note-input:focus { border-bottom-color: var(--accent); }
+
+        /* QTY CONTROL (NEW) */
+        .qty-control { display: flex; align-items: center; gap: 10px; background: #222; border-radius: 8px; padding: 2px; }
+        .btn-qty { 
+            width: 25px; height: 25px; border: none; border-radius: 6px; 
+            font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .btn-minus { background: #333; color: white; }
+        .btn-plus { background: var(--accent); color: black; }
+        .qty-val { font-size: 13px; font-weight: bold; width: 15px; text-align: center; }
+
+        /* PAYMENT METHOD */
+        .pay-method-card { 
+            background: #1a1a1a; border: 1px solid #333; padding: 15px; border-radius: 12px; 
+            margin-bottom: 10px; display: flex; align-items: center; gap: 15px; cursor: pointer; 
+        }
+        .pay-method-card.active { border-color: var(--accent); background: rgba(0,255,136,0.05); }
+        .radio-circle { width: 18px; height: 18px; border: 2px solid #555; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .pay-method-card.active .radio-circle { border-color: var(--accent); }
+        .pay-method-card.active .radio-circle div { width: 10px; height: 10px; background: var(--accent); border-radius: 50%; }
+
+        .btn-pay-now { width: 100%; background: var(--accent); color: black; font-weight: 800; padding: 15px; border: none; border-radius: 12px; font-size: 16px; margin-top: 20px; cursor: pointer; }
+        
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <!-- LOADING -->
-    <div id="loading-screen">
-        <div class="spinner"></div>
-        <p style="margin-top:15px; font-size:12px; color:#aaa;">Memuat Menu...</p>
-    </div>
-
-    <!-- MAIN APP -->
-    <div id="app-container" style="display:none;">
-        <div class="header">
+    <div id="page-home">
+        <div class="hero-section"></div>
+        <div class="header-nav"><div class="table-badge" id="table-display">Loading...</div></div>
+        <div class="cat-container" id="cat-list"></div>
+        <div class="menu-section">
+            <h2 style="margin-bottom: 20px; font-weight:800;" id="cat-title">ALL MENU</h2>
+            <div class="menu-grid" id="menu-grid"></div>
+        </div>
+        <div class="cart-bar" id="cart-bar">
             <div>
-                <h2 style="font-size:18px; font-weight:700; color:white;">Cuan-in</h2>
-                <div style="font-size:10px; color:#aaa;" id="store-name-display">Loading...</div>
+                <div style="font-size:12px; color:#aaa;">Total Pesanan</div>
+                <div style="font-size:16px; font-weight:bold;" id="bar-total">Rp 0</div>
             </div>
-            <div class="table-badge">
-                <div class="status-dot"></div>
-                <span id="table-num-display">...</span>
-            </div>
-        </div>
-
-        <div class="categories" id="cat-container">
-            <!-- Inject JS -->
-        </div>
-
-        <div class="menu-grid" id="menu-container">
-            <!-- Inject JS -->
-        </div>
-
-        <!-- WAITERS AI BUTTON -->
-        <div class="floating-ai" onclick="openAI()">🤖</div>
-
-        <!-- CART BAR -->
-        <div class="bottom-nav" id="cart-bar">
-            <div>
-                <div style="font-size:11px; color:#aaa;">Total Pesanan</div>
-                <div style="font-size:16px; font-weight:700; color:var(--accent);" id="total-price-display">Rp 0</div>
-            </div>
-            <button class="btn-checkout" onclick="checkout()">PESAN SEKARANG (<span id="cart-count">0</span>)</button>
+            <button class="btn-checkout" onclick="goToRincian()">LANJUT BAYAR (<span id="bar-count">0</span>)</button>
         </div>
     </div>
 
-    <!-- MODAL AI -->
-    <div id="modal-ai" class="modal">
-        <div class="modal-content">
-            <h3 style="margin-bottom:15px; display:flex; justify-content:space-between;">
-                🤖 Waiters AI 
-                <span style="font-size:12px; color:#aaa; font-weight:400;">BETA</span>
-                <span onclick="document.getElementById('modal-ai').style.display='none'" style="cursor:pointer;">✕</span>
-            </h3>
-            <div class="chat-box" id="ai-chat">
-                <div class="msg bot">Halo! Bingung mau pesan apa? Tanya aku ya! (Contoh: "Rekomendasi kopi manis")</div>
-            </div>
-            <div class="input-area">
-                <input type="text" id="ai-input" class="ai-input" placeholder="Tanya menu..." onkeypress="handleEnter(event)">
-                <button onclick="sendAI()" style="background:var(--accent); border:none; width:40px; border-radius:10px; cursor:pointer;">➤</button>
-            </div>
+    <div id="modal-variant" class="modal" style="justify-content:center; align-items:center; display:none;">
+        <div style="background:#1a1a1a; padding:20px; border-radius:15px; width:90%; max-width:400px; position:relative; top:20%;">
+            <h3 id="var-title" style="margin-bottom:5px;">Pilih Varian</h3>
+            <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Pilih salah satu varian untuk menu ini.</p>
+            <div id="var-list" class="variant-grid"></div>
+            <button onclick="closeModal('modal-variant')" style="width:100%; padding:12px; background:#333; color:white; border:none; border-radius:10px; margin-top:15px;">Batal</button>
         </div>
     </div>
 
-    <!-- SCRIPT LOGIC -->
+    <div id="page-rincian" class="modal">
+        <div class="modal-header">
+            <button class="btn-back" onclick="closeModal('page-rincian')">←</button>
+            <div class="modal-title">Rincian Pesanan</div>
+            <div style="width:24px;"></div>
+        </div>
+        
+        <div id="rincian-items"></div>
+
+        <div style="margin-top: 30px; border-top: 4px solid #1a1a1a; padding-top: 20px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px; color:#ccc;"><span>Sub Total</span><span id="bill-sub">0</span></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px; color:#ccc;"><span>Pajak (10%)</span><span id="bill-tax">0</span></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px; color:#ccc;"><span>Service (5%)</span><span id="bill-svc">0</span></div>
+            <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:18px; font-weight:800; color:var(--accent);"><span>Total</span><span id="bill-total">0</span></div>
+        </div>
+
+        <button class="btn-pay-now" onclick="goToPaymentForm()" style="background:var(--primary); color:white;">LANJUT KE DATA DIRI</button>
+    </div>
+
+    <div id="page-payment" class="modal">
+        <div class="modal-header">
+            <button class="btn-back" onclick="closeModal('page-payment')">←</button>
+            <div class="modal-title">Pembayaran</div>
+            <div style="width:24px;"></div>
+        </div>
+
+        <div style="background:#1a1a1a; padding:15px; border-radius:12px; margin-bottom:20px;">
+            <div style="font-size:12px; color:#aaa;">Total Tagihan</div>
+            <div style="font-size:24px; font-weight:800; color:var(--accent);" id="final-total-display">Rp 0</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Nama Lengkap*</label>
+            <input type="text" id="input-name" class="form-input" placeholder="Contoh: Budi Santoso">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Nomor Telepon</label>
+            <input type="tel" id="input-phone" class="form-input" placeholder="08xx-xxxx-xxxx">
+        </div>
+        
+        <div style="background:#111; padding:15px; border-radius:10px; margin-bottom:20px; border:1px solid #333;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+                <span style="font-size:13px;">Kirim Struk Ke Email?</span>
+                <input type="checkbox" id="email-check" style="transform:scale(1.5);" onchange="toggleEmail()">
+            </div>
+            <div id="email-box" class="hidden" style="margin-top:15px; border-top:1px dashed #444; padding-top:10px;">
+                <label class="form-label">Alamat Email</label>
+                <input type="email" id="input-email" class="form-input" placeholder="nama@email.com">
+            </div>
+        </div>
+
+        <h4 style="margin-bottom:10px;">Metode Pembayaran</h4>
+        <div class="pay-method-card" onclick="selectMethod('qris', this)">
+            <div class="radio-circle"><div></div></div>
+            <div style="flex:1;">
+                <div style="font-weight:bold;">QRIS (Scan Langsung)</div>
+                <div style="font-size:11px; color:#aaa;">Otomatis Lunas</div>
+            </div>
+            <i data-lucide="qr-code" style="color:white;"></i>
+        </div>
+        <div class="pay-method-card" onclick="selectMethod('cashier', this)">
+            <div class="radio-circle"><div></div></div>
+            <div style="flex:1;">
+                <div style="font-weight:bold;">Bayar Di Kasir</div>
+                <div style="font-size:11px; color:#aaa;">Tunai / Debit / Kredit</div>
+            </div>
+            <i data-lucide="store" style="color:white;"></i>
+        </div>
+
+        <button class="btn-pay-now" onclick="processOrder()">BAYAR SEKARANG</button>
+    </div>
+
+    <div id="page-qris" class="modal" style="text-align:center;">
+        <div style="background:#222; padding:5px 15px; border-radius:20px; color:var(--accent); display:inline-block;">Selesaikan dalam 10:00</div>
+        <h3 style="margin-top:15px;">QRIS Pembayaran</h3>
+        <img src="qris.jpg" style="width:250px; border-radius:15px; border:4px solid white; margin:20px 0;">
+        <h2 style="color:var(--accent);" id="qris-amount">Rp 0</h2>
+        <button class="btn-pay-now" style="background:#333; color:white;" onclick="checkStatus()">Cek Status</button>
+    </div>
+
+    <div id="page-cashier" class="modal" style="text-align:center;">
+        <h2>BAYAR DI KASIR</h2>
+        <div style="background:#111; border:2px dashed var(--accent); padding:30px; border-radius:15px; margin:40px 0;">
+            <div style="font-size:12px; color:#aaa;">NOMOR PESANAN</div>
+            <div class="big-code" id="cashier-code" style="font-size:40px; font-weight:800; color:var(--accent); letter-spacing:5px;">---</div>
+        </div>
+        <h2 style="color:var(--accent);" id="cashier-total">Rp 0</h2>
+        <button class="btn-pay-now" onclick="location.reload()">SELESAI</button>
+    </div>
+
+    <script>lucide.createIcons();</script>
+
     <script type="module">
-        // --- INTEGRASI SUPABASE (INLINED) ---
-        // Menggabungkan db-config.js ke sini agar tidak error modul relative path
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-        // Konfigurasi Supabase
         const supabaseUrl = 'https://anftjwlvwslsndjxwyij.supabase.co'; 
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFuZnRqd2x2d3Nsc25kanh3eWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NjY3NjcsImV4cCI6MjA4MTQ0Mjc2N30.fIAKkktcun45-AqoHauuER8TcQI_H1NWgNN93elC9aA'; 
-        
-        // Inisialisasi
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        const db = supabase; 
-        // --- END INTEGRASI ---
+        const db = createClient(supabaseUrl, supabaseKey);
 
-        // --- STATE ---
-        let currentStoreId = null;
-        let currentTableId = null;
         let products = [];
-        let cart = [];
-        
-        // 1. INIT: AMBIL PARAMETER QR
+        let cart = []; 
+        let currentStoreId = null;
+        let currentTableNum = "MEJA 0";
+        let selectedMethod = '';
+        let billData = { sub:0, tax:0, svc:0, total:0 };
+        let tempSelectedProduct = null; 
+
         async function init() {
             const urlParams = new URLSearchParams(window.location.search);
-            const qrUuid = urlParams.get('q'); // UUID dari QR Code
+            const qrUuid = urlParams.get('q');
 
-            if(!qrUuid) {
-                // Untuk testing tanpa QR, kita bisa bypass (Opsional)
-                // alert("❌ QR Code tidak valid! Mohon scan ulang.");
-                // return;
-                console.warn("Mode Tanpa QR: Menggunakan data dummy/kosong");
+            if (qrUuid) {
+                const { data: table } = await db.from('tables').select('*').eq('qr_uuid', qrUuid).single();
+                if (table) {
+                    currentStoreId = table.store_id;
+                    currentTableNum = table.table_number;
+                }
+            } else {
+                const { data: store } = await db.from('stores').select('id').limit(1).single();
+                if(store) currentStoreId = store.id;
             }
 
-            try {
-                // A. Validasi Meja (Hanya jalan jika ada QR UUID)
-                if (qrUuid) {
-                    const { data: tableData, error } = await db.from('tables')
-                        .select('*, stores(name)')
-                        .eq('qr_uuid', qrUuid)
-                        .single();
+            document.getElementById('table-display').innerText = currentTableNum;
+            loadMenu();
+        }
 
-                    if(error || !tableData) throw new Error("Meja tidak ditemukan");
-
-                    currentStoreId = tableData.store_id;
-                    currentTableId = tableData.id;
-
-                    // Update UI Header
-                    document.getElementById('table-num-display').innerText = tableData.table_number;
-                    document.getElementById('store-name-display').innerText = tableData.stores?.name || "Resto";
-                } else {
-                    // Fallback jika dibuka langsung tanpa QR (Testing)
-                    // Ambil toko pertama yg ditemukan
-                    // const { data: store } = await db.from('stores').select('id, name').limit(1).single();
-                    // if(store) {
-                    //     currentStoreId = store.id;
-                    //     document.getElementById('store-name-display').innerText = store.name + " (Test Mode)";
-                    // }
-                    // Jika mode produksi, harusnya return error
-                }
-
-                // B. Ambil Menu
-                // Pastikan currentStoreId ada (dari QR atau fallback)
-                if (currentStoreId) {
-                    const { data: menuData } = await db.from('products')
-                        .select('*')
-                        .eq('store_id', currentStoreId)
-                        .eq('stock', 0, { negate: true }) 
-                        .gt('stock', 0) // Filter Stok > 0
-                        .order('category');
-                    products = menuData || [];
-                } else {
-                    // Jika tidak ada store ID (misal user buka file langsung tanpa ?q=...), kosongkan
-                     products = [];
-                }
-
+        async function loadMenu() {
+            const { data } = await db.from('products').select('*').gt('stock', 0);
+            if(data) {
+                products = currentStoreId ? data.filter(p => p.store_id === currentStoreId) : data;
+                renderCat();
                 renderMenu('all');
-                renderCategories();
-
-                document.getElementById('loading-screen').style.display = 'none';
-                document.getElementById('app-container').style.display = 'block';
-
-            } catch (err) {
-                alert("Gagal memuat: " + err.message);
-                document.getElementById('loading-screen').innerHTML = `<p style="color:red">${err.message}</p>`;
             }
         }
 
-        // 2. RENDER KATEGORI
-        function renderCategories() {
+        function renderCat() {
             const cats = ['all', ...new Set(products.map(p => p.category))];
-            const container = document.getElementById('cat-container');
-            container.innerHTML = cats.map(c => 
-                `<div class="cat-chip ${c==='all'?'active':''}" onclick="filterCat('${c}', this)">${c.toUpperCase()}</div>`
+            document.getElementById('cat-list').innerHTML = cats.map(c => 
+                `<div class="cat-item ${c==='all'?'active':''}" onclick="filterMenu('${c}', this)">${c.toUpperCase()}</div>`
             ).join('');
         }
 
-        window.filterCat = (cat, el) => {
-            document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+        window.filterMenu = (cat, el) => {
+            document.querySelectorAll('.cat-item').forEach(c => c.classList.remove('active'));
             el.classList.add('active');
             renderMenu(cat);
-        };
-
-        // 3. RENDER MENU GRID
-        function renderMenu(cat) {
-            const container = document.getElementById('menu-container');
-            const filtered = cat === 'all' ? products : products.filter(p => p.category === cat);
-            
-            if (filtered.length === 0) {
-                container.innerHTML = `<div style="text-align:center; grid-column:1/-1; color:#aaa; padding:50px;">Menu tidak tersedia atau belum dimuat.</div>`;
-                return;
-            }
-
-            container.innerHTML = filtered.map(p => {
-                // Placeholder image jika null
-                const img = p.image_url || 'https://via.placeholder.com/150/16213e/ffffff?text=MENU'; 
-                return `
-                <div class="menu-card">
-                    <img src="${img}" class="menu-img">
-                    <div class="menu-info">
-                        <div class="menu-name">${p.name}</div>
-                        <div class="menu-desc">${p.description || 'Tidak ada deskripsi.'}</div>
-                        <div class="menu-price">Rp ${p.price.toLocaleString()}</div>
-                    </div>
-                    <div class="btn-add" onclick="addToCart(${p.id})">+</div>
-                </div>
-                `;
-            }).join('');
         }
 
-        // 4. CART LOGIC
-        window.addToCart = (id) => {
-            const p = products.find(x => x.id === id);
-            cart.push(p);
-            updateCartUI();
+        function renderMenu(cat) {
+            const list = cat === 'all' ? products : products.filter(p => p.category === cat);
+            const grid = document.getElementById('menu-grid');
+            document.getElementById('cat-title').innerText = cat === 'all' ? 'SEMUA MENU' : cat;
             
-            // Animasi getar kecil di HP
-            if(navigator.vibrate) navigator.vibrate(50); 
-        };
+            grid.innerHTML = list.map(p => {
+                const hasVar = p.variants && p.variants.length > 0;
+                return `
+                <div class="menu-card">
+                    <img src="${p.image_url || 'https://via.placeholder.com/300'}" class="menu-img">
+                    <div class="menu-body">
+                        <div class="menu-name">${p.name} ${hasVar ? '<span style="font-size:10px; color:#aaa;">(Opsi)</span>' : ''}</div>
+                        <div class="menu-price">Rp ${p.price.toLocaleString()}</div>
+                    </div>
+                    <div class="btn-add" onclick='checkVariant(${JSON.stringify(p).replace(/"/g, '&quot;')})'>+</div>
+                </div>
+            `}).join('');
+        }
 
-        function updateCartUI() {
-            const total = cart.reduce((sum, item) => sum + item.price, 0);
-            document.getElementById('total-price-display').innerText = "Rp " + total.toLocaleString();
-            document.getElementById('cart-count').innerText = cart.length;
+        window.checkVariant = (p) => {
+            if (typeof p === 'string') p = JSON.parse(p); 
+            if (p.variants && p.variants.length > 0) {
+                tempSelectedProduct = p;
+                document.getElementById('var-title').innerText = p.name;
+                const vList = document.getElementById('var-list');
+                vList.innerHTML = p.variants.map((v, i) => `
+                    <div class="variant-btn" onclick="selectVariant(${i})">
+                        <div style="font-weight:bold;">${v.name}</div>
+                        <div style="font-size:11px; color:#aaa;">+ Rp ${v.price.toLocaleString()}</div>
+                    </div>
+                `).join('');
+                document.getElementById('modal-variant').style.display = 'flex';
+            } else {
+                addToCart(p, null);
+            }
+        }
+
+        window.selectVariant = (index) => {
+            const variant = tempSelectedProduct.variants[index];
+            addToCart(tempSelectedProduct, variant);
+            closeModal('modal-variant');
+        }
+
+        window.addToCart = (p, variant) => {
+            const finalPrice = p.price + (variant ? variant.price : 0);
+            const finalName = p.name + (variant ? ` (${variant.name})` : '');
+            const idUnique = p.id + (variant ? '-' + variant.name : '');
+
+            const exist = cart.find(c => c.idUnique === idUnique);
+            if(exist) {
+                exist.qty++;
+            } else {
+                cart.push({
+                    id: p.id,
+                    idUnique: idUnique,
+                    name: finalName,
+                    price: finalPrice,
+                    qty: 1,
+                    isVariant: !!variant,
+                    note: '' 
+                });
+            }
+            updateBar();
+        }
+
+        function updateBar() {
+            const count = cart.reduce((a,b) => a + b.qty, 0);
+            const total = cart.reduce((a,b) => a + (b.price * b.qty), 0);
+            document.getElementById('bar-count').innerText = count;
+            document.getElementById('bar-total').innerText = "Rp " + total.toLocaleString();
             
             const bar = document.getElementById('cart-bar');
-            if(cart.length > 0) bar.classList.add('active');
+            if(count > 0) bar.classList.add('active');
             else bar.classList.remove('active');
         }
 
-        // 5. CHECKOUT (Kirim ke Dapur)
-        window.checkout = async () => {
-            if(cart.length === 0) return;
-            if(!confirm(`Pesan ${cart.length} item seharga Rp ${cart.reduce((a,b)=>a+b.price,0).toLocaleString()}?`)) return;
+        // --- NEW: EDIT QTY FUNCTION ---
+        window.changeQty = (index, delta) => {
+            const item = cart[index];
+            item.qty += delta;
 
-            const btn = document.querySelector('.btn-checkout');
-            btn.innerText = "Memproses...";
+            if (item.qty <= 0) {
+                // Hapus item jika 0
+                cart.splice(index, 1);
+            }
+            
+            // Re-render & Update
+            updateBar();
+            if (cart.length > 0) {
+                goToRincian(); // Refresh modal content
+            } else {
+                closeModal('page-rincian'); // Tutup modal kalo habis
+            }
+        }
+
+        window.closeModal = (id) => document.getElementById(id).style.display = 'none';
+        window.toggleEmail = () => {
+            const checked = document.getElementById('email-check').checked;
+            const box = document.getElementById('email-box');
+            if(checked) box.classList.remove('hidden'); else box.classList.add('hidden');
+        }
+
+        window.goToRincian = () => {
+            const cont = document.getElementById('rincian-items');
+            
+            if(cart.length === 0) {
+                cont.innerHTML = "<div style='text-align:center; padding:20px; color:#aaa;'>Keranjang Kosong</div>";
+                document.getElementById('page-rincian').style.display = 'block';
+                return;
+            }
+
+            cont.innerHTML = cart.map((p, index) => {
+                const noteInputHtml = p.isVariant ? `
+                    <input type="text" class="note-input" 
+                        placeholder="Catatan (cth: Less Sugar)..." 
+                        value="${p.note}" 
+                        oninput="updateNote(${index}, this.value)">
+                ` : `<div style="font-size:10px; color:#555; font-style:italic;">Item Fix (Tidak ada catatan)</div>`;
+
+                return `
+                <div style="margin-bottom:15px; border-bottom:1px dashed #333; padding-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;">${p.name}</div>
+                            <div class="qty-control" style="margin-top:5px; width:fit-content;">
+                                <button class="btn-qty btn-minus" onclick="changeQty(${index}, -1)">-</button>
+                                <span class="qty-val">${p.qty}</span>
+                                <button class="btn-qty btn-plus" onclick="changeQty(${index}, 1)">+</button>
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                             <div style="font-weight:bold; color:var(--accent); font-size:13px;">Rp ${(p.price * p.qty).toLocaleString()}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        ${noteInputHtml}
+                    </div>
+                </div>
+            `}).join('');
+
+            // Hitung Bill
+            billData.sub = cart.reduce((a,b)=>a+(b.price*b.qty), 0);
+            billData.tax = Math.round(billData.sub * 0.1);
+            billData.svc = Math.round(billData.sub * 0.05);
+            billData.total = billData.sub + billData.tax + billData.svc;
+
+            document.getElementById('bill-sub').innerText = "Rp " + billData.sub.toLocaleString();
+            document.getElementById('bill-tax').innerText = "Rp " + billData.tax.toLocaleString();
+            document.getElementById('bill-svc').innerText = "Rp " + billData.svc.toLocaleString();
+            document.getElementById('bill-total').innerText = "Rp " + billData.total.toLocaleString();
+
+            document.getElementById('page-rincian').style.display = 'block';
+        }
+
+        window.updateNote = (index, val) => {
+            cart[index].note = val;
+        }
+
+        window.goToPaymentForm = () => {
+            if(cart.length === 0) return alert("Keranjang kosong!");
+            document.getElementById('page-rincian').style.display = 'none';
+            document.getElementById('final-total-display').innerText = "Rp " + billData.total.toLocaleString();
+            document.getElementById('page-payment').style.display = 'block';
+        }
+
+        window.selectMethod = (type, el) => {
+            selectedMethod = type;
+            document.querySelectorAll('.pay-method-card').forEach(c => {
+                c.classList.remove('active');
+                c.querySelector('.radio-circle').innerHTML = "";
+            });
+            el.classList.add('active');
+            el.querySelector('.radio-circle').innerHTML = "<div></div>";
+        }
+
+        window.processOrder = async () => {
+            const name = document.getElementById('input-name').value;
+            const phone = document.getElementById('input-phone').value;
+            const isEmail = document.getElementById('email-check').checked;
+            const email = isEmail ? document.getElementById('input-email').value : null;
+
+            if(!name) return alert("Nama wajib diisi!");
+            if(!selectedMethod) return alert("Pilih metode pembayaran!");
+            if(isEmail && !email) return alert("Email wajib diisi!");
+
+            const btn = document.querySelector('.btn-pay-now');
+            btn.innerText = "MEMPROSES...";
             btn.disabled = true;
 
             try {
-                // Grouping items logic could be here, but for now simple insert
-                // Kita butuh insert ke 'orders' dulu
-                const grandTotal = cart.reduce((sum, item) => sum + item.price, 0);
-                
-                // 1. Buat Order Header
                 const { data: order, error } = await db.from('orders').insert({
                     store_id: currentStoreId,
-                    table_id: currentTableId,
-                    table_number: document.getElementById('table-num-display').innerText,
-                    customer_name: "Self Service", // Bisa dibuat input nama kalau mau
-                    grand_total: grandTotal,
-                    subtotal: grandTotal,
-                    order_source: 'self_service',
-                    status: 'unpaid', // Masuk ke kasir sebagai unpaid
-                    payment_method: 'PENDING'
+                    table_number: currentTableNum,
+                    customer_name: `${name} (${phone})`,
+                    customer_email: email,
+                    grand_total: billData.total,
+                    subtotal: billData.sub,
+                    tax: billData.tax,
+                    service: billData.svc,
+                    payment_method: selectedMethod.toUpperCase(),
+                    status: selectedMethod === 'qris' ? 'paid' : 'unpaid',
+                    order_source: 'self_service'
                 }).select().single();
 
                 if(error) throw error;
 
-                // 2. Buat Order Items
-                // Kita perlu format array item sesuai struktur tabel order_items
-                // Agregasi item yang sama
-                const itemMap = {};
-                cart.forEach(p => {
-                    if(!itemMap[p.id]) itemMap[p.id] = { ...p, qty: 0 };
-                    itemMap[p.id].qty++;
-                });
-
-                const orderItemsPayload = Object.values(itemMap).map(p => ({
+                const itemsPayload = cart.map(p => ({
                     order_id: order.id,
                     product_id: p.id,
                     product_name: p.name,
                     price: p.price,
                     qty: p.qty,
-                    subtotal: p.price * p.qty
+                    subtotal: p.price * p.qty,
+                    notes: p.note
                 }));
+                await db.from('order_items').insert(itemsPayload);
 
-                await db.from('order_items').insert(orderItemsPayload);
-
-                alert("✅ Pesanan Berhasil! Mohon tunggu, pesanan sudah masuk ke dapur.");
+                document.getElementById('page-payment').style.display = 'none';
+                if(selectedMethod === 'qris') {
+                    document.getElementById('qris-amount').innerText = "Rp " + billData.total.toLocaleString();
+                    document.getElementById('page-qris').style.display = 'block';
+                } else {
+                    const code = order.order_number || order.id.toString().slice(-4);
+                    document.getElementById('cashier-code').innerText = code;
+                    document.getElementById('cashier-total').innerText = "Rp " + billData.total.toLocaleString();
+                    document.getElementById('page-cashier').style.display = 'block';
+                }
                 cart = [];
-                updateCartUI();
-                btn.innerText = "PESAN SEKARANG";
-                btn.disabled = false;
-                // Optional: Redirect ke halaman 'waiting' atau status pesanan
 
-            } catch (err) {
+            } catch(err) {
                 alert("Gagal order: " + err.message);
-                btn.innerText = "COBA LAGI";
+                btn.innerText = "BAYAR SEKARANG";
                 btn.disabled = false;
             }
-        };
+        }
 
-        // 6. WAITERS AI (SIMPLE KEYWORD MATCHING)
-        window.openAI = () => document.getElementById('modal-ai').style.display = 'flex';
-        window.handleEnter = (e) => { if(e.key === 'Enter') sendAI(); };
+        window.checkStatus = () => {
+            alert("Simulasi: Pembayaran Berhasil!");
+            location.reload();
+        }
 
-        window.sendAI = () => {
-            const input = document.getElementById('ai-input');
-            const q = input.value.toLowerCase();
-            const chat = document.getElementById('ai-chat');
-            
-            if(!q) return;
-
-            // User msg
-            chat.innerHTML += `<div class="msg user">${input.value}</div>`;
-            input.value = "";
-            chat.scrollTop = chat.scrollHeight;
-
-            // Simulate Thinking
-            setTimeout(() => {
-                let reply = "Maaf, aku kurang paham. Coba tanya 'rekomendasi kopi' atau 'makanan pedas'.";
-                
-                // Simple Logic (Bisa diganti LLM beneran nanti)
-                const matched = products.filter(p => 
-                    p.name.toLowerCase().includes(q) || 
-                    (p.description && p.description.toLowerCase().includes(q)) ||
-                    (p.category.toLowerCase().includes(q))
-                );
-
-                if (matched.length > 0) {
-                    const pick = matched[Math.floor(Math.random() * matched.length)];
-                    reply = `Aku sarankan coba <b>${pick.name}</b> (Rp ${pick.price.toLocaleString()}). ${pick.description || ''}`;
-                } else if (q.includes('halo') || q.includes('hi')) {
-                    reply = "Halo kak! Mau pesan apa hari ini?";
-                }
-
-                chat.innerHTML += `<div class="msg bot">${reply}</div>`;
-                chat.scrollTop = chat.scrollHeight;
-            }, 800);
-        };
-
-        // Start
         init();
     </script>
 </body>
